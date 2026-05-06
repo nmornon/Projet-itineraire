@@ -6,15 +6,9 @@ def normalisation_angle(angle):
     return (angle+np.pi)%(2*np.pi)-np.pi
 
 
-def gps_to_xy(lat,long):
-    
-    R_earth=6378000
-    
-    lat=np.deg2rad(lat)
-    lon=np.deg2rad(lon)
-    
-    #comment convertir les corrdonées du gps qui sotn en lat et long 
-    
+def gps_to_xy(lat,lon):
+
+    return lat*111110, lon*60000
     
     
 def f(x,u,dt):
@@ -43,7 +37,7 @@ def F(x,u,dt):
     
     F=np.array([
        [ 1,0,-v*dt*np.sin(theta)],
-       [0,1,-v*dt*np.cos(theta)],
+       [0,1,v*dt*np.cos(theta)],
        [0,0,1]
        ])
     
@@ -93,7 +87,7 @@ N=len(time)
 #calcul du dt
 
 dt_array=np.diff(time)
-dt_mean=np.mena(dt_array)
+dt_mean=np.mean(dt_array)
 
 print("dt moyen", dt_mean)
 
@@ -118,11 +112,11 @@ x_gps_lisse=moving_average(x_gps,window=10)
 y_gps_lisse=moving_average(y_gps,window=10)
 
 erreur_x_gps=x_gps-x_gps_lisse
-erreur_y_gps=x_gps-y_gps_lisse
+erreur_y_gps=y_gps-y_gps_lisse
 
 sigma_gps_x2=np.var(erreur_x_gps)
 sigma_gps_y2=np.var(erreur_y_gps)
-sigma_gps_xy=np.var(erreur_x_gps,erreur_y_gps)[0,1]
+sigma_gps_xy=np.cov(erreur_x_gps,erreur_y_gps)[0,1]
 
 R=np.array([
     [sigma_gps_x2,sigma_gps_xy],
@@ -141,12 +135,12 @@ erreur_omega = gz - gz_lisse
 sigma_omega2 = np.var(erreur_omega)
 
 
-Q = np.array([
+Q_u = np.array([
     [sigma_v2, 0.0],
     [0.0, sigma_omega2]
     ])
 
-print("Q : ",Q)
+print("Q : ",Q_u)
 
 #inialisation EKF
 
@@ -181,7 +175,7 @@ for k in range(N):
     
     x_pred=f(x,u,dt_k)
     
-    F=F(x,u,dt_k)
+    F_k=F(x,u,dt_k)
     
     theta=x[2,0]
     
@@ -191,9 +185,9 @@ for k in range(N):
         [0.0,                  dt_k]
         ])
     
-    Q=Gamma@Q@Gamma.T
+    Q=Gamma@Q_u@Gamma.T
     
-    P_pred=F@P@F.T+Q
+    P_pred=F_k@P@F_k.T+Q
     
     #position mesurée par le GPS
     z_gps=np.array([
@@ -211,7 +205,7 @@ for k in range(N):
     
     S=H@P_pred@H.T+R
     
-    K=P_pred@H.Y@np.linalg.inv(S)
+    K=P_pred@H.T@np.linalg.inv(S)
     
     x=x_pred+K@erreur
     
@@ -223,7 +217,7 @@ for k in range(N):
     x_filt[k, :] = x.ravel()
     innovation_hist[k, :] = erreur.ravel()
     
-plt.plot(x_gps,y_gps,lebel="GPS brut")
+plt.plot(x_gps,y_gps,label="GPS brut")
 plt.plot(x_gps_lisse,y_gps_lisse,label="GPS lissé")
 plt.plot(x_filt[:, 0], x_filt[:, 1], label="EKF GPS + IMU")
 plt.legend()
@@ -245,6 +239,7 @@ plt.xlabel("temps (s)")
 plt.ylabel("v (m/s)")
 plt.title("Vitesse estimée depuis le GPS")
 plt.show()
+    
     
     
 
