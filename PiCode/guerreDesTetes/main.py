@@ -225,6 +225,7 @@ def game_loop(state, lock, flask_display=None):
             points = list(state["latest_points"])
             imu = state["latest_imu"]
 
+        ennemi.afficher(frame)
         update_camera_window(frame, imu)
         update_map_window(points)
         #last_imu_print = print_imu(imu, last_imu_print)
