@@ -1,3 +1,5 @@
+import argparse
+import sys
 import cv2
 import time
 import threading
@@ -14,9 +16,9 @@ from config import (
     MIN_DETECTION_ANGLE, MAX_DETECTION_ANGLE, QUALITY_THRESHOLD,
 )
 from guerreDesTetes.capture import capture_face_sprite
-from PiCode.guerreDesTetes.aquisition.camera_worker import camera_worker
-from PiCode.guerreDesTetes.aquisition.lidar_worker import lidar_worker
-from PiCode.guerreDesTetes.aquisition.imu_worker import imu_worker
+from guerreDesTetes.camera_worker import camera_worker
+from guerreDesTetes.lidar_worker import lidar_worker
+from guerreDesTetes.imu_worker import imu_worker
 
 SELFIE_SAVE_DIR = Path("guerreDesTetes/selfies")
 MAP_WINDOW_SIZE = 500
@@ -61,15 +63,28 @@ def draw_text_block(frame, lines, origin=(10, 25), line_height=22, font_scale=0.
                     cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), 1, cv2.LINE_AA)
 
 
+_MAP_OVERLAY_SIZE = 160  # taille en px de la minimap incrustée en haut à droite
+
+def _overlay_map(camera_frame, points):
+    """Incrustation de la carte LiDAR en haut à droite du frame caméra."""
+    size = _MAP_OVERLAY_SIZE
+    mini = render_lidar_frame(points, max_range=MAP_MAX_RANGE, window_size=size,
+                              min_range=MIN_DETECTION_RANGE)
+    draw_text_block(mini, [f"{len(points)} pts"], font_scale=0.4)
+    out = camera_frame.copy()
+    _, w = out.shape[:2]
+    out[0:size, w - size:w] = mini
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Phase 1 — Capture des selfies
 # ---------------------------------------------------------------------------
 
-def selfie_phase(state, lock, button, led):
+def selfie_phase(state, lock, button, led, flask_display=None):
     """
     Boucle de capture et validation des selfies.
-    Lit depuis state['latest_frame'] (le thread caméra doit être démarré).
-    Bouton physique : capture  |  'q' : passer au jeu (≥1 selfie requis).
+    Bouton physique : capture  |  'q' (ou 'q'+Entrée en mode Flask) : passer au jeu.
     Retourne le dernier sprite validé, ou None.
     """
     SELFIE_SAVE_DIR.mkdir(exist_ok=True)
@@ -78,7 +93,10 @@ def selfie_phase(state, lock, button, led):
     blank = np.zeros((480, 640, 3), dtype=np.uint8)
     draw_text_block(blank, ["Attente caméra..."])
 
-    print("=== Phase selfie — Bouton: capturer | q: lancer le jeu (>=1 selfie) ===")
+    if flask_display is not None:
+        print("=== Phase selfie (Flask) — Bouton: capturer | tapez 'q'+Entrée pour lancer le jeu ===")
+    else:
+        print("=== Phase selfie — Bouton: capturer | q: lancer le jeu (>=1 selfie) ===")
 
     while True:
         with lock:
@@ -89,11 +107,23 @@ def selfie_phase(state, lock, button, led):
             f"Selfie #{index}",
             "BOUTON: capturer  |  q: lancer le jeu",
         ])
-        cv2.imshow("Selfie", display)
 
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('q') and index > 0:
-            break
+        if flask_display is not None:
+            flask_display(display)
+            time.sleep(0.033)
+            # Vérification non-bloquante de stdin (Linux/Pi)
+            try:
+                import select
+                if index > 0 and select.select([sys.stdin], [], [], 0)[0]:
+                    if sys.stdin.readline().strip().lower() == 'q':
+                        break
+            except Exception:
+                pass
+        else:
+            cv2.imshow("Selfie", display)
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q') and index > 0:
+                break
 
         if button.is_pressed():
             led.on()
@@ -105,8 +135,12 @@ def selfie_phase(state, lock, button, led):
 
             face = capture_face_sprite(frame)
             if face is not None:
-                cv2.imshow("Sprite Capturé", face)
-                cv2.waitKey(1000)
+                if flask_display is not None:
+                    flask_display(face)
+                    time.sleep(1.0)
+                else:
+                    cv2.imshow("Sprite Capturé", face)
+                    cv2.waitKey(1000)
                 conf = input("Sprite correct ? (y/n) : ").strip().lower()
                 if conf == 'y':
                     sprite_path = str(SELFIE_SAVE_DIR / f"sprite_{index:03d}.jpg")
@@ -114,7 +148,8 @@ def selfie_phase(state, lock, button, led):
                     sprite = face
                     print(f"Sprite sauvegardé : {sprite_path}")
                     index += 1
-                cv2.destroyWindow("Sprite Capturé")
+                if flask_display is None:
+                    cv2.destroyWindow("Sprite Capturé")
             else:
                 print("[selfie] Aucun visage détecté, réessayez.")
 
@@ -122,7 +157,8 @@ def selfie_phase(state, lock, button, led):
             led.off()
             time.sleep(0.2)
 
-    cv2.destroyWindow("Selfie")
+    if flask_display is None:
+        cv2.destroyWindow("Selfie")
     return sprite
 
 
@@ -161,19 +197,20 @@ def print_imu(imu, last_print_time, interval=0.5):
     return last_print_time
 
 
-def game_loop(state, lock):
+def game_loop(state, lock, flask_display=None):
     """
-    Boucle principale du jeu — appelle une fonction par tâche à chaque frame :
-      - update_camera_window : flux caméra (ennemis AR a ajouter plus tard)
-      - update_map_window    : vue LiDAR top-down (ennemis en rouge plus tard)
-      - print_imu            : print console (debugg, à retirer plus tard)
-    'q' pour quitter.
+    Boucle principale du jeu.
+    En mode Flask : carte LiDAR incrustée en haut à droite du flux caméra.
+    'q' pour quitter (Ctrl+C en mode Flask).
     """
     blank = np.zeros((480, 640, 3), dtype=np.uint8)
     draw_text_block(blank, ["Attente camera..."])
     last_imu_print = 0.0
 
-    print("=== Boucle de jeu demarree — 'q' pour quitter ===")
+    if flask_display is not None:
+        print("=== Boucle de jeu demarree (Flask) — Ctrl+C pour quitter ===")
+    else:
+        print("=== Boucle de jeu demarree — 'q' pour quitter ===")
 
     while True:
         with lock:
@@ -181,13 +218,22 @@ def game_loop(state, lock):
             points = list(state["latest_points"])
             imu = state["latest_imu"]
 
-        update_camera_window(frame, imu)
-        update_map_window(points)
-        last_imu_print = print_imu(imu, last_imu_print)
+        if flask_display is not None:
+            if imu is not None:
+                ax, ay, az, gx, gy, gz = imu
+                draw_text_block(frame, [
+                    f"Accel: ({ax:.2f}, {ay:.2f}, {az:.2f}) g",
+                    f"Gyro:  ({gx:.2f}, {gy:.2f}, {gz:.2f}) dps",
+                ], origin=(10, frame.shape[0] - 55))
+            flask_display(_overlay_map(frame, points))
+        else:
+            update_camera_window(frame, imu)
+            update_map_window(points)
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
+                break
 
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'):
-            break
+        last_imu_print = print_imu(imu, last_imu_print)
 
     cv2.destroyAllWindows()
 
@@ -197,6 +243,17 @@ def game_loop(state, lock):
 # ---------------------------------------------------------------------------
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--displayflask', action='store_true',
+                        help="Stream les fenêtres via Flask (/video) au lieu d'OpenCV imshow")
+    args = parser.parse_args()
+
+    flask_display = None
+    if args.displayflask:
+        from guerreDesTetes.display import set_preview_frame
+        flask_display = set_preview_frame
+        print("Flask stream disponible sur http://0.0.0.0:5000/video")
+
     print("Initialisation de la camera...")
     camera = Camera()
     camera.configure()
@@ -239,8 +296,8 @@ def main():
         lid_thread.start()
         imu_thread.start()
 
-        selfie_phase(state, lock, button, led)
-        game_loop(state, lock)
+        selfie_phase(state, lock, button, led, flask_display=flask_display)
+        game_loop(state, lock, flask_display=flask_display)
 
     except KeyboardInterrupt:
         print("\nArret demande.")
