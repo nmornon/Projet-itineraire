@@ -53,7 +53,7 @@ def calibrate_imu(imu_csv_path: Path, axe_attraction_terrestre: str):
     # Centrer les données (soustraction de la moyenne)
     df_calibrated = df.copy()
     df_calibrated[columns_to_calibrate] = df[columns_to_calibrate] - means
-    df_calibrated['accel_' + axe_attraction_terrestre] += 9.81  # Ajouter la gravité à l'axe spécifié
+    df_calibrated['accel_' + axe_attraction_terrestre] += 1  # Ajouter la gravité à l'axe spécifié
 
     # Créer le chemin du fichier de sortie
     output_filename = imu_csv_path.stem + "_calibrated.csv"
