@@ -9,6 +9,7 @@ from pathlib import Path
 from sensors.CAMERA import Camera
 from sensors.LIDAR import LIDAR
 from utils import Button, LED
+from postprocessing.rotate_lidar_scans_180 import rotate_point_180_via_polar
 from config import (
     PORT_BUTTON, PORT_LED,
     PORT_LIDAR,
@@ -16,13 +17,18 @@ from config import (
     MIN_DETECTION_ANGLE, MAX_DETECTION_ANGLE, QUALITY_THRESHOLD,
 )
 from guerreDesTetes.capture import capture_face_sprite
-from guerreDesTetes.camera_worker import camera_worker
-from guerreDesTetes.lidar_worker import lidar_worker
-from guerreDesTetes.imu_worker import imu_worker
+from guerreDesTetes.aquisition.camera_worker import camera_worker
+from guerreDesTetes.aquisition.lidar_worker import lidar_worker
+from guerreDesTetes.aquisition.imu_worker import imu_worker
+from guerreDesTetes.overlay import load_heads, overlay_png, viseur
 
 SELFIE_SAVE_DIR = Path("guerreDesTetes/selfies")
 MAP_WINDOW_SIZE = 500
 MAP_MAX_RANGE = 3000  # mm — portée affichée sur la fenêtre Map
+
+# def load_heads(size=(130,130), path="selfies/"):
+# def overlay_png(frame,png,x,y):
+# def viseur(frame):
 
 
 # ---------------------------------------------------------------------------
@@ -133,19 +139,14 @@ def selfie_phase(state, lock, button, led, flask_display=None):
 
             cv2.imwrite(str(SELFIE_SAVE_DIR / f"selfie_{index:03d}.jpg"), frame)
 
-            face = capture_face_sprite(frame)
-            if face is not None:
-                if flask_display is not None:
-                    flask_display(face)
-                    time.sleep(1.0)
-                else:
-                    cv2.imshow("Sprite Capturé", face)
-                    cv2.waitKey(1000)
+            sprite = capture_face_sprite(frame)
+            if sprite is not None:
+                cv2.imshow("Sprite", sprite)
+                cv2.waitKey(1000)
                 conf = input("Sprite correct ? (y/n) : ").strip().lower()
                 if conf == 'y':
                     sprite_path = str(SELFIE_SAVE_DIR / f"sprite_{index:03d}.jpg")
-                    cv2.imwrite(sprite_path, face)
-                    sprite = face
+                    cv2.imwrite(sprite_path, sprite)
                     print(f"Sprite sauvegardé : {sprite_path}")
                     index += 1
                 if flask_display is None:
@@ -174,6 +175,9 @@ def update_camera_window(frame, imu):
             f"Accel: ({ax:.2f}, {ay:.2f}, {az:.2f}) g",
             f"Gyro:  ({gx:.2f}, {gy:.2f}, {gz:.2f}) dps",
         ], origin=(10, frame.shape[0] - 55))
+
+        # rajouter viseur sur frame
+        frame = viseur(frame)
     cv2.imshow("Camera", frame)
 
 
@@ -199,9 +203,11 @@ def print_imu(imu, last_print_time, interval=0.5):
 
 def game_loop(state, lock, flask_display=None):
     """
-    Boucle principale du jeu.
-    En mode Flask : carte LiDAR incrustée en haut à droite du flux caméra.
-    'q' pour quitter (Ctrl+C en mode Flask).
+    Boucle principale du jeu — appelle une fonction par tâche à chaque frame :
+      - update_camera_window : flux caméra (ennemis AR a ajouter plus tard)
+      - update_map_window    : vue LiDAR top-down (ennemis en rouge plus tard)
+      - print_imu            : print console (debugg, à retirer plus tard) (a retirer de suite)
+    'q' pour quitter.
     """
     blank = np.zeros((480, 640, 3), dtype=np.uint8)
     draw_text_block(blank, ["Attente camera..."])
@@ -218,20 +224,13 @@ def game_loop(state, lock, flask_display=None):
             points = list(state["latest_points"])
             imu = state["latest_imu"]
 
-        if flask_display is not None:
-            if imu is not None:
-                ax, ay, az, gx, gy, gz = imu
-                draw_text_block(frame, [
-                    f"Accel: ({ax:.2f}, {ay:.2f}, {az:.2f}) g",
-                    f"Gyro:  ({gx:.2f}, {gy:.2f}, {gz:.2f}) dps",
-                ], origin=(10, frame.shape[0] - 55))
-            flask_display(_overlay_map(frame, points))
-        else:
-            update_camera_window(frame, imu)
-            update_map_window(points)
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord('q'):
-                break
+        update_camera_window(frame, imu)
+        update_map_window(points)
+        #last_imu_print = print_imu(imu, last_imu_print)
+
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
+            break
 
         last_imu_print = print_imu(imu, last_imu_print)
 

@@ -1,46 +1,46 @@
 import cv2
 import numpy as np
-import mediapipe as mp
 
 SPRITE_SIZE = 128   # taille du sprite carré en sortie (pixels)
 
+_face_cascade = cv2.CascadeClassifier(
+    '/home/pi/env13_capteurs/lib/python3.13/site-packages/cv2/data/haarcascade_frontalface_default.xml'
+)
 
 def capture_face_sprite(frame):
     """
-    Récupère une photo et la transforme en visage
+    Recup une photo et la transforme en visage.
     """
-
-    # Je tente de détecter le vizage
     h, w = frame.shape[:2]
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) #mediapipe utilise du rgb
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    with mp.solutions.face_detection.FaceDetection(min_detection_confidence=0.5) as detector:
-        result = detector.process(rgb)
+    faces = _face_cascade.detectMultiScale(
+        gray,
+        scaleFactor=1.1,
+        minNeighbors=8,
+        minSize=(80, 80)
+    )
 
-    #Rien détecté
-    if not result.detections:
+    # Rien détecté
+    if len(faces) == 0:
         print("[capture] Aucun visage détecté.")
         return None
 
+    # Premier visage détecté
+    x_min, y_min, box_width, box_height = faces[0]
 
-    detection_box = result.detections[0].location_data.relative_bounding_box
-
-    print(detection_box)
-    # Convertion en pixels
-    x_min = int(detection_box.xmin * w)
-    y_min = int(detection_box.ymin * h)
-    box_width = int(detection_box.width * w)
-    box_height = int(detection_box.height * h)
+    print(f"[capture] Visage détecté : x={x_min} y={y_min} w={box_width} h={box_height}")
 
     # Extraction du visage
     sprite = frame[y_min:y_min + box_height, x_min:x_min + box_width]
     sprite = cv2.resize(sprite, (SPRITE_SIZE, SPRITE_SIZE), interpolation=cv2.INTER_AREA)
 
-    print(f"[capture] Sprite prêt ({SPRITE_SIZE}x{SPRITE_SIZE} px).")
+    print(f"[capture] Sprite pret ({SPRITE_SIZE}x{SPRITE_SIZE} px).")
     return sprite
 
+
 if __name__ == "__main__":
-    selfie = cv2.imread("guerreDesTetes/selfies/selfie_001.jpg")
+    selfie = cv2.imread("guerreDesTetes/selfies/selfie_000.jpg")
     sprite = capture_face_sprite(selfie)
     if sprite is not None:
         cv2.imshow("Sprite", sprite)
