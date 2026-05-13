@@ -18,10 +18,15 @@ from guerreDesTetes.capture import capture_face_sprite
 from guerreDesTetes.aquisition.camera_worker import camera_worker
 from guerreDesTetes.aquisition.lidar_worker import lidar_worker
 from guerreDesTetes.aquisition.imu_worker import imu_worker
+from guerreDesTetes.overlay import load_heads, overlay_png, viseur
 
 SELFIE_SAVE_DIR = Path("guerreDesTetes/selfies")
 MAP_WINDOW_SIZE = 500
 MAP_MAX_RANGE = 3000  # mm — portée affichée sur la fenêtre Map
+
+# def load_heads(size=(130,130), path="selfies/"):
+# def overlay_png(frame,png,x,y):
+# def viseur(frame):
 
 
 # ---------------------------------------------------------------------------
@@ -138,6 +143,9 @@ def update_camera_window(frame, imu):
             f"Accel: ({ax:.2f}, {ay:.2f}, {az:.2f}) g",
             f"Gyro:  ({gx:.2f}, {gy:.2f}, {gz:.2f}) dps",
         ], origin=(10, frame.shape[0] - 55))
+
+        # rajouter viseur sur frame
+        frame = viseur(frame)
     cv2.imshow("Camera", frame)
 
 
