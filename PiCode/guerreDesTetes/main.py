@@ -21,6 +21,7 @@ from guerreDesTetes.aquisition.camera_worker import camera_worker
 from guerreDesTetes.aquisition.lidar_worker import lidar_worker
 from guerreDesTetes.aquisition.imu_worker import imu_worker
 from guerreDesTetes.overlay import load_heads, overlay_png, viseur
+from guerreDesTetes.gameUtils.game import Ennemi
 
 SELFIE_SAVE_DIR = Path("guerreDesTetes/selfies")
 MAP_WINDOW_SIZE = 500
@@ -316,4 +317,5 @@ def main():
 
 
 if __name__ == "__main__":
+    ennemi = Ennemi("test", 45, 1500, 0)
     main()
