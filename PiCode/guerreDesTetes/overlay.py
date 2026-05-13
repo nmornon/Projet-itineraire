@@ -1,16 +1,15 @@
 import cv2
 
-def load_heads(size=(130,130)):
+def load_heads(size=(130,130), path="selfies/"):
     """charge les têtes depuis le dossier heads/"""
 
     heads=[]
 
-    files=["heads/tete1.png",
-            "heads/tete2.png"]
+    files = [f for f in os.listdir(path) if f.endswith(".png") and f.startswith("sprite")]
 
     for file in files :
 
-        img=cv2.imread(file)
+        img=cv2.imread(os.path.join(path, file))
 
         if img is None:
             print("impossible de charger : ",file)
