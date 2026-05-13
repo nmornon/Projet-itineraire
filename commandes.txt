@@ -1,0 +1,1 @@
+export PYTHONPATH=~/Desktop/ITIneraire/pi_itineraire_26_09/PiCode/

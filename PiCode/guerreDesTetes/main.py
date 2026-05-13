@@ -7,6 +7,7 @@ from pathlib import Path
 from sensors.CAMERA import Camera
 from sensors.LIDAR import LIDAR
 from utils import Button, LED
+from postprocessing.rotate_lidar_scans_180 import rotate_point_180_via_polar
 from config import (
     PORT_BUTTON, PORT_LED,
     PORT_LIDAR,
@@ -14,9 +15,9 @@ from config import (
     MIN_DETECTION_ANGLE, MAX_DETECTION_ANGLE, QUALITY_THRESHOLD,
 )
 from guerreDesTetes.capture import capture_face_sprite
-from PiCode.guerreDesTetes.aquisition.camera_worker import camera_worker
-from PiCode.guerreDesTetes.aquisition.lidar_worker import lidar_worker
-from PiCode.guerreDesTetes.aquisition.imu_worker import imu_worker
+from guerreDesTetes.aquisition.camera_worker import camera_worker
+from guerreDesTetes.aquisition.lidar_worker import lidar_worker
+from guerreDesTetes.aquisition.imu_worker import imu_worker
 
 SELFIE_SAVE_DIR = Path("guerreDesTetes/selfies")
 MAP_WINDOW_SIZE = 500
@@ -103,15 +104,14 @@ def selfie_phase(state, lock, button, led):
 
             cv2.imwrite(str(SELFIE_SAVE_DIR / f"selfie_{index:03d}.jpg"), frame)
 
-            face = capture_face_sprite(frame)
-            if face is not None:
-                cv2.imshow("Sprite Capturé", face)
+            sprite = capture_face_sprite(frame)
+            if sprite is not None:
+                cv2.imshow("Sprite", sprite)
                 cv2.waitKey(1000)
                 conf = input("Sprite correct ? (y/n) : ").strip().lower()
                 if conf == 'y':
                     sprite_path = str(SELFIE_SAVE_DIR / f"sprite_{index:03d}.jpg")
-                    cv2.imwrite(sprite_path, face)
-                    sprite = face
+                    cv2.imwrite(sprite_path, sprite)
                     print(f"Sprite sauvegardé : {sprite_path}")
                     index += 1
                 cv2.destroyWindow("Sprite Capturé")
@@ -166,7 +166,7 @@ def game_loop(state, lock):
     Boucle principale du jeu — appelle une fonction par tâche à chaque frame :
       - update_camera_window : flux caméra (ennemis AR a ajouter plus tard)
       - update_map_window    : vue LiDAR top-down (ennemis en rouge plus tard)
-      - print_imu            : print console (debugg, à retirer plus tard)
+      - print_imu            : print console (debugg, à retirer plus tard) (a retirer de suite)
     'q' pour quitter.
     """
     blank = np.zeros((480, 640, 3), dtype=np.uint8)
@@ -183,7 +183,7 @@ def game_loop(state, lock):
 
         update_camera_window(frame, imu)
         update_map_window(points)
-        last_imu_print = print_imu(imu, last_imu_print)
+        #last_imu_print = print_imu(imu, last_imu_print)
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
