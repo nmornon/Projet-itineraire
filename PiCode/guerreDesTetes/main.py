@@ -71,17 +71,16 @@ def draw_text_block(frame, lines, origin=(10, 25), line_height=22, font_scale=0.
                     cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), 1, cv2.LINE_AA)
 
 
-_MAP_OVERLAY_SIZE = 160  # taille en px de la minimap incrustée en haut à droite
+MAP_OVERLAY_SIZE = 200  # taille en px de la minimap incrustée en haut à droite
 
-def _overlay_map(camera_frame, points):
+def overlay_map(camera_frame, minimap):
     """Incrustation de la carte LiDAR en haut à droite du frame caméra."""
-    size = _MAP_OVERLAY_SIZE
-    mini = render_lidar_frame(points, max_range=MAP_MAX_RANGE, window_size=size,
-                              min_range=MIN_DETECTION_RANGE)
-    draw_text_block(mini, [f"{len(points)} pts"], font_scale=0.4)
+    size = MAP_OVERLAY_SIZE
     out = camera_frame.copy()
     _, w = out.shape[:2]
-    out[0:size, w - size:w] = mini
+    if minimap.shape[:2] != (size, size):
+        minimap = cv2.resize(minimap, (size, size))
+    out[0:size, w - size:w] = minimap
     return out
 
 
@@ -189,12 +188,12 @@ def update_camera_window(frame, imu, show_window=True):
     return frame
 
 
-def update_map_window(points, show_window=True):
+def create_map_window(points, show_window=True):
     """Prépare la fenêtre Map avec le dernier scan LiDAR."""
     map_frame = render_lidar_frame(points, max_range=MAP_MAX_RANGE,
                                    window_size=MAP_WINDOW_SIZE,
                                    min_range=MIN_DETECTION_RANGE)
-    draw_text_block(map_frame, [f"LiDAR — {len(points)} pts"])
+    #draw_text_block(map_frame, [f"LiDAR — {len(points)} pts"])
     if show_window:
         cv2.imshow("Map", map_frame)
     return map_frame
@@ -233,12 +232,16 @@ def game_loop(state, lock, flask_display=None):
             points = list(state["latest_points"])
             imu = state["latest_imu"]
 
+        # minimap LiDAR
+        minimap = create_map_window(points, show_window=flask_display is None)
+
         for ennemi in ennemis:
-            frame = ennemi.afficher(frame)
+            frame = ennemi.render(frame, minimap)
+            ennemi.wander()
 
         if flask_display is not None:
             camera_frame = update_camera_window(frame, imu, show_window=False)
-            flask_display(_overlay_map(camera_frame, points))
+            flask_display(overlay_map(camera_frame, minimap))
             try:
                 import select
                 if select.select([sys.stdin], [], [], 0)[0]:
@@ -249,7 +252,6 @@ def game_loop(state, lock, flask_display=None):
             time.sleep(0.033)
         else:
             update_camera_window(frame, imu)
-            update_map_window(points)
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'):
@@ -338,9 +340,9 @@ def main():
 
 if __name__ == "__main__":
     ennemiAdam = Ennemi("test", angle=0, profondeur=1000, z=0, vie=3, sprite=load_heads()[0])
-    ennemiTheo = Ennemi("test", angle=200, profondeur=1000, z=0, vie=3, sprite=load_heads()[1])
-    ennemi = Ennemi("test", angle=-200, profondeur=1000, z=0, vie=3, sprite=load_heads()[1])
-    ennemi2 = Ennemi("test", angle=90, profondeur=1000, z=0, vie=3, sprite=load_heads()[2])
-    ennemi3 = Ennemi("test", angle=-90, profondeur=1000, z=0, vie=3, sprite=load_heads()[3])
-    ennemis = [ennemiTheo, ennemi2, ennemi3, ennemiAdam,ennemi]
+    ennemiTheo = Ennemi("test", angle=5, profondeur=8000, z=0, vie=3, sprite=load_heads()[1])
+    ennemi = Ennemi("test", angle=10, profondeur=5000, z=0, vie=3, sprite=load_heads()[1])
+    ennemi2 = Ennemi("test", angle=12, profondeur=10000, z=0, vie=3, sprite=load_heads()[2])
+    ennemi3 = Ennemi("test", angle=56, profondeur=5000, z=0, vie=3, sprite=load_heads()[3])
+    ennemis = [ennemiAdam, ennemiTheo]
     main()
