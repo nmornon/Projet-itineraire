@@ -3,6 +3,7 @@ import sys
 import cv2
 import time
 import threading
+import random
 import numpy as np
 from pathlib import Path
 
@@ -232,7 +233,8 @@ def game_loop(state, lock, flask_display=None):
             points = list(state["latest_points"])
             imu = state["latest_imu"]
 
-        frame = ennemi.afficher(frame)
+        for ennemi in ennemis:
+            frame = ennemi.afficher(frame)
 
         if flask_display is not None:
             camera_frame = update_camera_window(frame, imu, show_window=False)
@@ -314,7 +316,7 @@ def main():
         lid_thread.start()
         imu_thread.start()
 
-        selfie_phase(state, lock, button, led, flask_display=flask_display)
+        #selfie_phase(state, lock, button, led, flask_display=flask_display)
         game_loop(state, lock, flask_display=flask_display)
 
     except KeyboardInterrupt:
@@ -335,5 +337,10 @@ def main():
 
 
 if __name__ == "__main__":
-    ennemi = Ennemi("test", angle=45, profondeur=1000, z=0, vie=3, sprite=load_heads()[0])
+    ennemiAdam = Ennemi("test", angle=0, profondeur=1000, z=0, vie=3, sprite=load_heads()[0])
+    ennemiTheo = Ennemi("test", angle=200, profondeur=1000, z=0, vie=3, sprite=load_heads()[1])
+    ennemi = Ennemi("test", angle=-200, profondeur=1000, z=0, vie=3, sprite=load_heads()[1])
+    ennemi2 = Ennemi("test", angle=90, profondeur=1000, z=0, vie=3, sprite=load_heads()[2])
+    ennemi3 = Ennemi("test", angle=-90, profondeur=1000, z=0, vie=3, sprite=load_heads()[3])
+    ennemis = [ennemiTheo, ennemi2, ennemi3, ennemiAdam,ennemi]
     main()

@@ -32,7 +32,7 @@ CAMERA_MODE = "preview"
 #   (640, 480)
 #   (1280, 720)
 #   (1920, 1080)
-CAMERA_RESOLUTION = (640, 480)
+CAMERA_RESOLUTION = (1080, 720)
 
 
 # Framerate cible en images par seconde

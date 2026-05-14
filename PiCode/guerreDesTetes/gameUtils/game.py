@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 from guerreDesTetes.overlay import overlay_png
-from guerreDesTetes.gameUtils.projections import _lidar_to_image
+from guerreDesTetes.gameUtils.projections import *
 
 class Entity:
     def __init__(self, nom, position=[0, 0, 0], sprite=None):
@@ -15,8 +15,8 @@ class Entity:
     def getPosition(self):
         return self._position
 
-    def setPosition(self, r, teta, z):
-        self._position = np.array([r, teta, z])
+    def setPosition(self, theta, r, z):
+        self._position = np.array([theta % 360, r, z])
 
 class Ennemi(Entity):
     def __init__(self, nom, angle, profondeur, z, vie=3, sprite=None):
@@ -28,7 +28,7 @@ class Ennemi(Entity):
         u, v = project_point_world_to_image(self.getPosition())
         if u is None or v is None:
             return frame
-        print(f"Ennemi {self.nom} projeté en (u={u}, v={v})")
+        #print(f"Ennemi {self.nom} projeté en (u={u}, v={v}), angle ={self.getPosition()[0]:.1f}°, profondeur={self.getPosition()[1]:.1f}mm")
         if self.sprite is not None:
             return overlay_png(frame, self.sprite, u, v)
         cv2.drawMarker(frame, (u, v), (0, 0, 255), cv2.MARKER_CROSS, 20, 2)

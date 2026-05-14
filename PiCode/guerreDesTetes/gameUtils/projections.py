@@ -4,7 +4,7 @@ import cv2
 from pathlib import Path
 
 # Recup des donnees de calibration caméra
-CALIBRATION_PATH = Path(__file__).resolve().parents[2] / "images" / "camera_calibration.npz"
+CALIBRATION_PATH = "camera_calibration.npz"
 with np.load(CALIBRATION_PATH) as cal:
     K = cal["camera_matrix"].copy()
     DIST = cal["dist_coeffs"].copy()
@@ -34,19 +34,19 @@ def create_transformation_matrix(R, T):
     return mat
 
 def polar_to_cartesian(angle_deg, depth_mm, z_mm):
-    """Coordonnées polaires LiDAR → cartésien. angle=0 est "devant" (axe Y)."""
+    """Coordonnées polaires LiDAR à cartésien. angle=0 est "devant" (axe Y)."""
     rad = math.radians(angle_deg)
     return np.array([depth_mm * math.sin(rad), depth_mm * math.cos(rad), float(z_mm)])
 
 
 def project_point_world_to_image(point_world, H_w_to_lidar=np.eye(4)):
     """Projette un point cartésien monde vers un pixel image. Retourne None si hors champ."""
-    P_lidar = (H_w_to_lidar @ np.append(point_world, 1))[:3]
-    P_cam = R_lidar_to_cam @ (P_lidar - T_lidar_to_cam)
+    P_lidar = (H_w_to_lidar @ np.append(point_world, 1))[:3] # monde -> LiDAR
+    P_cam = R_lidar_to_cam @ (P_lidar - T_lidar_to_cam) # LiDAR -> caméra
     if P_cam[2] <= 0:
         return None
-    pixel = K @ P_cam
-    pixel /= pixel[2]
+    pixel = K @ P_cam # caméra -> image
+    pixel /= pixel[2] # homogène -> pixel avec w
     return int(pixel[0]), int(pixel[1])
 
 if __name__ == "__main__":

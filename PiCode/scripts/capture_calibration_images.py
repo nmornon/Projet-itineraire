@@ -1,20 +1,63 @@
 from pathlib import Path
 import argparse
+import select
+import sys
+import time
+
 import cv2
 
 from sensors.CAMERA import Camera
 from core.calibration import detect_checkerboard
-from core.display import show_frame
+from core.display import draw_overlay, show_frame, _compute_font_params
 from utils import create_acquisition_directory
 from config import DIM_GRID, DISPLAY_SIZE
 
 
-def main(output_root, size=None):
+def _render_preview(frame, extra_lines=None, size=None):
+    preview = frame.copy()
+
+    if size is not None:
+        preview = cv2.resize(preview, size)
+
+    height, width = preview.shape[:2]
+    font_scale, thickness, origin, line_height = _compute_font_params(width, height)
+
+    draw_overlay(
+        preview,
+        extra_lines=extra_lines,
+        font_scale=font_scale,
+        thickness=thickness,
+        origin=origin,
+        line_height=line_height
+    )
+
+    return preview
+
+
+def _read_stdin_command():
+    try:
+        if select.select([sys.stdin], [], [], 0)[0]:
+            return sys.stdin.readline().strip().lower()
+    except Exception:
+        return None
+
+    return None
+
+
+def main(output_root, size=None, displayflask=False):
     print("Initialisation de la caméra...")
     camera = Camera()
     camera.configure()
     camera.start()
     camera.warmup()
+
+    flask_display = None
+    if displayflask:
+        from guerreDesTetes.display import set_preview_frame
+
+        flask_display = set_preview_frame
+        print("Flask stream disponible sur http://0.0.0.0:8080/video")
+        print("Commandes terminal: c = capturer, s = sauvegarder, n = ignorer, q = quitter")
 
     session_dir, subdirs = create_acquisition_directory(
         root_dir=output_root,
@@ -44,20 +87,24 @@ def main(output_root, size=None):
                 "Press 'q' to quit"
             ]
 
-            show_frame(
-              frame,
-              window_name="Calibration capture",
-              exit_key=None,
-              extra_lines=live_lines,
-              size=size
-            )
+            if flask_display is not None:
+                flask_display(_render_preview(frame, extra_lines=live_lines, size=size))
+                time.sleep(0.033)
+                key = _read_stdin_command()
+            else:
+                show_frame(
+                  frame,
+                  window_name="Calibration capture",
+                  exit_key=None,
+                  extra_lines=live_lines,
+                  size=size
+                )
+                key = chr(cv2.waitKey(1) & 0xFF)
 
-            key = cv2.waitKey(1) & 0xFF
-
-            if key == ord("q"):
+            if key == "q":
                 break
 
-            if key == ord("c"):
+            if key == "c":
                 # Capture d'une image candidate
                 candidate_frame = frame.copy()
 
@@ -81,25 +128,32 @@ def main(output_root, size=None):
 
                 # Boucle sur l'image candidate figée
                 while True:
-                    if show_frame(
-                        candidate_display,
-                        window_name="Calibration capture",
-                        exit_key=None,
-                        extra_lines=candidate_lines,
-                        size=size
-                    ):
-                        break
+                    if flask_display is not None:
+                        flask_display(_render_preview(candidate_display, extra_lines=candidate_lines, size=size))
+                        time.sleep(0.033)
+                        candidate_key = _read_stdin_command()
+                        if candidate_key is None:
+                            continue
+                    else:
+                        if show_frame(
+                            candidate_display,
+                            window_name="Calibration capture",
+                            exit_key=None,
+                            extra_lines=candidate_lines,
+                            size=size
+                        ):
+                            break
 
-                    candidate_key = cv2.waitKey(1) & 0xFF
+                        candidate_key = chr(cv2.waitKey(1) & 0xFF)
 
-                    if candidate_key == ord("q"):
+                    if candidate_key == "q":
                         return
 
-                    if candidate_key == ord("n"):
+                    if candidate_key == "n":
                         print("Image ignorée.")
                         break
 
-                    if candidate_key == ord("s"):
+                    if candidate_key == "s":
                         if found:
                             file_path = camera.save_frame_sequence(
                                 frame=candidate_frame,
@@ -140,11 +194,18 @@ if __name__ == "__main__":
         help="Taille de la fenêtre d'affichage (ex: --size 640 480)"
     )
 
+    parser.add_argument(
+        "--displayflask",
+        action="store_true",
+        help="Diffuse l'aperçu via Flask au lieu d'ouvrir une fenêtre OpenCV."
+    )
+
     args = parser.parse_args()
 
     display_size = tuple(args.size) if args.size is not None else DISPLAY_SIZE
 
     main(
         output_root=Path(args.output_root),
-        size=display_size
+        size=display_size,
+        displayflask=args.displayflask
     )

@@ -1,11 +1,11 @@
 import cv2
-
-def load_heads(size=(130,130), path="selfies/"):
+import os
+def load_heads(size=(130,130), path="guerreDesTetes/selfies/"):
     """charge les têtes depuis le dossier heads/"""
 
     heads=[]
 
-    files = [f for f in os.listdir(path) if f.endswith(".png") and f.startswith("sprite")]
+    files = [f for f in os.listdir(path) if f.endswith(".jpg") and f.startswith("sprite")]
 
     for file in files :
 
