@@ -142,8 +142,12 @@ def selfie_phase(state, lock, button, led, flask_display=None):
 
             sprite = capture_face_sprite(frame)
             if sprite is not None:
-                cv2.imshow("Sprite", sprite)
-                cv2.waitKey(1000)
+                if flask_display is not None:
+                    flask_display(sprite)
+                    time.sleep(1.0)
+                else:
+                    cv2.imshow("Sprite", sprite)
+                    cv2.waitKey(1000)
                 conf = input("Sprite correct ? (y/n) : ").strip().lower()
                 if conf == 'y':
                     sprite_path = str(SELFIE_SAVE_DIR / f"sprite_{index:03d}.jpg")
@@ -168,8 +172,8 @@ def selfie_phase(state, lock, button, led, flask_display=None):
 # Phase 2 — Boucle de jeu
 # ---------------------------------------------------------------------------
 
-def update_camera_window(frame, imu):
-    """Affiche la fenêtre Camera avec l'overlay IMU en bas de frame."""
+def update_camera_window(frame, imu, show_window=True):
+    """Prépare la vue Camera avec l'overlay IMU en bas de frame."""
     if imu is not None:
         ax, ay, az, gx, gy, gz = imu
         draw_text_block(frame, [
@@ -179,16 +183,20 @@ def update_camera_window(frame, imu):
 
         # rajouter viseur sur frame
         frame = viseur(frame)
-    cv2.imshow("Camera", frame)
+    if show_window:
+        cv2.imshow("Camera", frame)
+    return frame
 
 
-def update_map_window(points):
-    """Affiche la fenêtre Map avec le dernier scan LiDAR."""
+def update_map_window(points, show_window=True):
+    """Prépare la fenêtre Map avec le dernier scan LiDAR."""
     map_frame = render_lidar_frame(points, max_range=MAP_MAX_RANGE,
                                    window_size=MAP_WINDOW_SIZE,
                                    min_range=MIN_DETECTION_RANGE)
     draw_text_block(map_frame, [f"LiDAR — {len(points)} pts"])
-    cv2.imshow("Map", map_frame)
+    if show_window:
+        cv2.imshow("Map", map_frame)
+    return map_frame
 
 
 def print_imu(imu, last_print_time, interval=0.5):
@@ -212,7 +220,6 @@ def game_loop(state, lock, flask_display=None):
     """
     blank = np.zeros((480, 640, 3), dtype=np.uint8)
     draw_text_block(blank, ["Attente camera..."])
-    last_imu_print = 0.0
 
     if flask_display is not None:
         print("=== Boucle de jeu demarree (Flask) — Ctrl+C pour quitter ===")
@@ -225,16 +232,26 @@ def game_loop(state, lock, flask_display=None):
             points = list(state["latest_points"])
             imu = state["latest_imu"]
 
-        ennemi.afficher(frame)
-        update_camera_window(frame, imu)
-        update_map_window(points)
-        #last_imu_print = print_imu(imu, last_imu_print)
+        frame = ennemi.afficher(frame)
 
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'):
-            break
+        if flask_display is not None:
+            camera_frame = update_camera_window(frame, imu, show_window=False)
+            flask_display(_overlay_map(camera_frame, points))
+            try:
+                import select
+                if select.select([sys.stdin], [], [], 0)[0]:
+                    if sys.stdin.readline().strip().lower() == 'q':
+                        break
+            except Exception:
+                pass
+            time.sleep(0.033)
+        else:
+            update_camera_window(frame, imu)
+            update_map_window(points)
 
-        last_imu_print = print_imu(imu, last_imu_print)
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
+                break
 
     cv2.destroyAllWindows()
 
@@ -318,5 +335,5 @@ def main():
 
 
 if __name__ == "__main__":
-    ennemi = Ennemi("test", 45, 1500, 0)
+    ennemi = Ennemi("test", 10, 1500, 0)
     main()

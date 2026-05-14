@@ -3,13 +3,29 @@ from pathlib import Path
 from guerreDesTetes.overlay import overlay_png
 from guerreDesTetes.gameUtils.projections import _lidar_to_image
 
-class Ennemi:
-    def __init__(self, nom, angle, profondeur, z):
+class Entity:
+    _position = np.array([0, 0, 0]) # r, teta, z dans le repère monde
+    def __init__(self, nom, position=[0, 0, 0]):
         self.nom = nom
         self.sprite = None
-        self.angle = angle          # degrés, dans le repère LiDAR (après correction 180°)
-        self.profondeur = profondeur  # mm
-        self.z = z                  # mm (hauteur dans le repère LiDAR)
+        self._position = np.array(position)
+
+    def setSprite(self, sprite):
+        self.sprite = sprite
+
+    def getPosition(self):
+        return self._position
+    
+    def setPosition(self, position):
+        self._position = position
+
+    def setPosition(self, r, teta, z):
+        self._position = np.array([r, teta, z])
+
+class Enemy(Entity):
+        def __init__(self, nom, position=[0, 0, 0], vie=3):
+            super().__init__(nom, position)
+            self.vie = vie
 
     def setSprite(self, sprite):
         self.sprite = sprite
@@ -20,6 +36,7 @@ class Ennemi:
         if uv is None:
             return frame
         u, v = uv
+        print(f"Ennemi {self.nom} projeté en (u={u}, v={v})")
         if self.sprite is not None:
             return overlay_png(frame, self.sprite, u, v)
         # fallback : croix rouge si pas de sprite
