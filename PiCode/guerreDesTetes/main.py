@@ -335,5 +335,5 @@ def main():
 
 
 if __name__ == "__main__":
-    ennemi = Ennemi("test", 10, 1500, 0)
+    ennemi = Ennemi("test", angle=45, profondeur=1000, z=0, vie=3, sprite=load_heads()[0])
     main()

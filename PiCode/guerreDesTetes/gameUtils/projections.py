@@ -21,10 +21,6 @@ R_lidar_to_cam = np.array([
     [0,  1,  0],   # z_cam =  y_L
 ], dtype=np.float64)
 
-def set_world_repere():
-    #a completer
-    pass
-
 def addtuple(a,b):
     return tuple(map(sum,zip(a,b)))
 
@@ -37,17 +33,27 @@ def create_transformation_matrix(R, T):
     mat[3:,p-1:] = np.ones((1,1))
     return mat
 
-def project_point_world_to_image(point_world, H_w_to_lidar): # H la matrice de transformation (R T | 0 1)
-    """Projette un point du repère monde vers l'image caméra."""
-    point_lidar = H_w_to_lidar @ np.append(point_world, 1)
+def polar_to_cartesian(angle_deg, depth_mm, z_mm):
+    """Coordonnées polaires LiDAR → cartésien. angle=0 est "devant" (axe Y)."""
+    rad = math.radians(angle_deg)
+    return np.array([depth_mm * math.sin(rad), depth_mm * math.cos(rad), float(z_mm)])
 
-    
+
+def project_point_world_to_image(point_world, H_w_to_lidar=np.eye(4)):
+    """Projette un point cartésien monde vers un pixel image. Retourne None si hors champ."""
+    P_lidar = (H_w_to_lidar @ np.append(point_world, 1))[:3]
+    P_cam = R_lidar_to_cam @ (P_lidar - T_lidar_to_cam)
+    if P_cam[2] <= 0:
+        return None
+    pixel = K @ P_cam
+    pixel /= pixel[2]
+    return int(pixel[0]), int(pixel[1])
 
 if __name__ == "__main__":
     # Test rapide
     print("=== Test de projection LiDAR -> Image ===")
     test_points = [
-        (0, 1, 0),   # devant
+        (0, 1010, 0),   # devant
         (90, 1000, 0),  # à droite
         (-90, 1000, 0), # à gauche
         (180, 1000, 0), # derrière
@@ -56,5 +62,5 @@ if __name__ == "__main__":
     
     for angle, depth, z in test_points:
         print(f"Test: angle={angle}°, profondeur={depth}mm, z={z}mm")
-        pixel = project_point_world_to_image(np.array([angle, depth, z]), H)
+        pixel = project_point_world_to_image(np.array([angle, depth, z]))
         print(f"Résultat: {pixel}\n{'-'*40}\n")
