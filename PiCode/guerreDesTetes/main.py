@@ -23,7 +23,7 @@ from guerreDesTetes.aquisition.lidar_worker import lidar_worker
 from guerreDesTetes.aquisition.imu_worker import imu_worker
 from guerreDesTetes.overlay import load_heads, overlay_png, viseur
 from guerreDesTetes.gameUtils.game import Ennemi
-
+from guerreDesTetes.gameUtils.imu_position_tracking import update_imu_position_tracking, R_world_to_lidar
 SELFIE_SAVE_DIR = Path("guerreDesTetes/selfies")
 MAP_WINDOW_SIZE = 500
 MAP_MAX_RANGE = 3000  # mm — portée affichée sur la fenêtre Map
@@ -232,12 +232,16 @@ def game_loop(state, lock, flask_display=None):
             points = list(state["latest_points"])
             imu = state["latest_imu"]
 
+        # Update du repère lidar -> monde via IMU
+        if imu is not None:
+            update_imu_position_tracking(*imu)
+
         # minimap LiDAR
         minimap = create_map_window(points, show_window=flask_display is None)
 
         for ennemi in ennemis:
             frame = ennemi.render(frame, minimap)
-            ennemi.wander()
+            #ennemi.wander()
 
         if flask_display is not None:
             camera_frame = update_camera_window(frame, imu, show_window=False)
@@ -340,9 +344,9 @@ def main():
 
 if __name__ == "__main__":
     ennemiAdam = Ennemi("test", angle=0, profondeur=1000, z=0, vie=3, sprite=load_heads()[0])
-    ennemiTheo = Ennemi("test", angle=5, profondeur=8000, z=0, vie=3, sprite=load_heads()[1])
+    ennemiTheo = Ennemi("test", angle=90, profondeur=8000, z=0, vie=3, sprite=load_heads()[1])
     ennemi = Ennemi("test", angle=10, profondeur=5000, z=0, vie=3, sprite=load_heads()[1])
-    ennemi2 = Ennemi("test", angle=12, profondeur=10000, z=0, vie=3, sprite=load_heads()[2])
+    ennemi2 = Ennemi("test", angle=180, profondeur=10000, z=0, vie=3, sprite=load_heads()[2])
     ennemi3 = Ennemi("test", angle=56, profondeur=5000, z=0, vie=3, sprite=load_heads()[3])
-    ennemis = [ennemiAdam, ennemiTheo]
+    ennemis = [ennemiAdam, ennemiTheo,ennemi2]
     main()

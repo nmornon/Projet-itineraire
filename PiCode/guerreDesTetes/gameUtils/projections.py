@@ -14,7 +14,7 @@ T_lidar_to_cam = np.array([32.0, 124.0, 0.0]) # mesures récup distance caméra-
 
 # Rotation LiDAR à Caméra
 # LiDAR (après correction 180°) : X=droite, Y=avant, Z=haut
-# Caméra OpenCV                 : X=droite, Y=bas,   Z=profondeur
+# Caméra OpenCV                 : X=droite, Y=bas,   Z=profondeur c pa vrai en ft
 R_lidar_to_cam = np.array([
     [1,  0,  0],   # x_cam =  x_L
     [0,  0, -1],   # y_cam = -z_L
@@ -50,7 +50,7 @@ def project_point_world_to_image(point_world, H_w_to_lidar=np.eye(4)):
     return int(pixel[0]), int(pixel[1])
 
 if __name__ == "__main__":
-    # Test rapide
+    # Test de 
     print("=== Test de projection LiDAR -> Image ===")
     test_points = [
         (0, 1010, 0),   # devant
