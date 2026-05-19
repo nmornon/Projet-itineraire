@@ -1,5 +1,7 @@
 import cv2
 import os
+import numpy as np
+
 def load_heads(size=(130,130), path="guerreDesTetes/selfies/"):
     """charge les têtes depuis le dossier heads/"""
 
@@ -21,7 +23,20 @@ def load_heads(size=(130,130), path="guerreDesTetes/selfies/"):
 
     return heads 
 
-    
+def overlay_png_opacite(frame: np.ndarray, png: np.ndarray, x: int, y: int) -> np.ndarray:
+    h, w = png.shape[:2]
+    x = x - w // 2
+    y = y - h // 2
+
+    bgr = png[:, :, :3].astype(float)
+    alpha = png[:, :, 3].astype(float) / 255.0
+
+    roi = frame[y : y + h, x : x + w].astype(float)
+    for c in range(3):
+        roi[:, :, c] = (alpha * bgr[:, :, c] + (1.0 - alpha) * roi[:, :, c])
+    frame[y : y + h, x : x + w] = roi.astype(np.uint8)
+    return frame
+
 def overlay_png(frame,png,x,y):
     """ajoute une image PNG sur une frame OpenCV
     
