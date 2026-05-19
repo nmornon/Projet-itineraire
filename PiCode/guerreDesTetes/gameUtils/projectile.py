@@ -4,6 +4,7 @@ import numpy as np
 
 from pathlib import Path
 from typing import List, Optional, Tuple
+from overlay import overlay_png_opacite
 
 TAILLE_SPRITE_DEFAUT: Tuple[int, int] = (128, 128)
 
@@ -47,28 +48,13 @@ class Projectile:
             return fond
         centre_x = fond.shape[1] // 2
         centre_y = fond.shape[0] // 2
-        return _overlay_png(fond, sprite, centre_x, centre_y)
+        return overlay_png_opacite(fond, sprite, centre_x, centre_y)
 
     def __repr__(self) -> str:
         return (
             f"Projectile(angle={self.angle}, profondeur={self.profondeur}, "
             f"z={self.z}, frame={self.current_sprite_index}/{len(self.sprites)})"
         )
-
-def _overlay_png(background: np.ndarray, overlay: np.ndarray, cx: int, cy: int) -> np.ndarray:
-    h, w = overlay.shape[:2]
-    x = cx - w // 2
-    y = cy - h // 2
-
-    bgr = overlay[:, :, :3].astype(float)
-    alpha = overlay[:, :, 3].astype(float) / 255.0
-
-    roi = background[y : y + h, x : x + w].astype(float)
-    for c in range(3):
-        roi[:, :, c] = (alpha * bgr[:, :, c] + (1.0 - alpha) * roi[:, :, c])
-    background[y : y + h, x : x + w] = roi.astype(np.uint8)
-    return background
-
 
 if __name__ == "__main__":
     projectile = Projectile(angle=45.0, profondeur=10.0, z=0)
