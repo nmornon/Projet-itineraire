@@ -24,6 +24,7 @@ from guerreDesTetes.aquisition.imu_worker import imu_worker
 from guerreDesTetes.overlay import load_heads, overlay_png, viseur
 from guerreDesTetes.gameUtils.game import Ennemi
 from guerreDesTetes.gameUtils.imu_position_tracking import update_imu_position_tracking, R_world_to_lidar
+from guerreDesTetes.gameUtils.projectile import Projectile
 SELFIE_SAVE_DIR = Path("guerreDesTetes/selfies")
 MAP_WINDOW_SIZE = 500
 MAP_MAX_RANGE = 3000  # mm — portée affichée sur la fenêtre Map
@@ -31,7 +32,6 @@ MAP_MAX_RANGE = 3000  # mm — portée affichée sur la fenêtre Map
 # def load_heads(size=(130,130), path="selfies/"):
 # def overlay_png(frame,png,x,y):
 # def viseur(frame):
-
 
 # ---------------------------------------------------------------------------
 # Rendu — fonctions issues de replay_multisensor.py
@@ -209,6 +209,17 @@ def print_imu(imu, last_print_time, interval=0.5):
         return now
     return last_print_time
 
+def create_projectile(position, projectiles):
+    """Crée un projectile à partir d'une position et d'un sprite."""
+    projectile = Projectile(nom="Projectile", position=position)
+    projectiles.append(projectile)
+
+def update_projectiles(projectiles, frame):
+    """Met à jour la position et l'animation de chaque projectile."""
+    for proj in projectiles:
+        proj.move(10)
+        proj.updateFrame()
+        proj.render_image(frame)
 
 def game_loop(state, lock, flask_display=None):
     """
