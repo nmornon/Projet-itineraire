@@ -241,7 +241,7 @@ On peut interprêter $\mathbf F$ comme la matrice qui représente la dynamique d
 
 On pourrait penser que l'on s'est trompé sur la non linéarité de notre système mais on doit se rappeler que celle-ci se cache dans notre matrice de rotation.
 
-\subsubsection{Matrice Q}
+\subsubsection{Matrices Q et R}
 En reprenant la forme d'un système dynamique on a vu que l'on observait du bruit de processus $\mathbf w_{k-1}$ (modèle) et du bruit de mesure $\mathbf v_k$ (capteur) suivant des lois de la forme :
 \[
 \begin{aligned}
@@ -251,7 +251,12 @@ En reprenant la forme d'un système dynamique on a vu que l'on observait du brui
 \]
 les matrices $\mathbf Q_k$ et $\mathbf R$ représentant les matrices de covariance du bruit.
 
-On peut remarquer que depuis le début $\mathbf R$ ne dépendait pas de $k$, la raison est que l'on n'opère aucune transformation dans la fonction $h$ sur les mesures de notre capteur GNSS. On ne s'intéresse alors qu'à l'expression de $\mathbf Q_k$. Initialement on a : 
+On peut remarquer que depuis le début $\mathbf R$ ne dépendait pas de $k$, la raison est que l'on n'opère aucune transformation dans la fonction $h$ sur les mesures de notre capteur GNSS. On a alors :
+\[
+\mathbf R = \mathbf R_0 = \operatorname{diag}\left(\sigma_{\lambda, 0}^2, \, \sigma_{\varphi, 0}^2 \right)
+\]
+
+Intéressons nous maintenant à l'expression de la matrice $\mathbf Q_k$, initialement on a : 
 \[
 \mathbf Q_0 = \operatorname{diag}\left(\sigma_{a, \lambda, 0}^2, \, \sigma_{a, \varphi, 0}^2, \, \sigma_{\omega, \theta, 0}^2, \, \sigma_{\omega, \phi, 0}^2, \, \sigma_{\omega, \psi, 0}^2 \right)
 \]
