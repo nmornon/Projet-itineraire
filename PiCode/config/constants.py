@@ -68,11 +68,50 @@ CONFIG_XL_RANGE = {2:0b00,16:0b01,4:0b10,8:0b11}
 # Sensibilités des capteurs pour conversion des données brutes en unités physiques
 CONFIG_XL_SENSITIVITY = {2:0.061,4:0.122,8:0.244,16:0.488}
 
-# Mappages des fréquences (Hz) pour le gyroscope
+# ── Gyroscope ──────────────────────────────────────
 CONFIG_G_FREQ = {0:0b0000,12.5:0b0001,26:0b0010,52:0b0011,104:0b0100,208:0b0101,416:0b0110,833:0b0111,1660:0b1000,3330:0b1001,6660:0b1010}
-
-# Mappages des plages (full-scale range) pour le gyroscope
 CONFIG_G_RANGE = {250:0b00,500:0b01,1000:0b10,2000:0b11}
-
-# Sensibilités des capteurs pour conversion des données brutes en unités physiques
 CONFIG_G_SENSITIVITY = {125:4.375,250:8.75,500:17.50,1000:35,2000:70}
+
+# ── Magnétomètre ───────────────────────────────────
+OUTX_L_MAG = 0x28
+CTRL_REG1 = 0x20
+CTRL_REG2 = 0x21
+
+
+
+CTRL_REG1 = 0x20  # Registre de configuration du magnetometre (frequence)
+CTRL_REG2 = 0x21  # Registre de configuration du magnetometre (plage)
+OUT_X_L = 0x28  # Registre de lecture du magnetometre
+
+# Mappages des frequences (Hz) pour le magnetometre
+CONFIG_MAG_FREQ = {
+    0.625: 0b000000,
+    1.25: 0b000010,
+    2.5: 0b000100,
+    5: 0b000110,
+    10: 0b001000,
+    20: 0b001010,
+    40: 0b001100,
+    80: 0b001110,
+    155: 0b110001,
+    300: 0b100001,
+    560: 0b010001,
+    1000: 0b000001,
+}
+
+# Mappages des plages (full-scale range) pour le magnetometre
+CONFIG_MAG_RANGE = {
+    4: 0,  # +/-4 gauss
+    8: 1,  # +/-8 gauss
+    12: 2,  # +/-12 gauss
+    16: 3,  # +/-16 gauss
+}
+
+# Sensibilites du magnetometre pour convertir les donnees brutes
+CONFIG_MAG_SENSITIVITY = {
+    4: 6842,  # LSB/gauss
+    8: 3421,  # LSB/gauss
+    12: 2281,  # LSB/gauss
+    16: 1711,  # LSB/gauss
+}

@@ -32,7 +32,7 @@ CAMERA_MODE = "preview"
 #   (640, 480)
 #   (1280, 720)
 #   (1920, 1080)
-CAMERA_RESOLUTION = (1080, 720)
+CAMERA_RESOLUTION = (640, 480)
 
 
 # Framerate cible en images par seconde
@@ -111,7 +111,11 @@ CAMERA_FOV_DEGREES = 12.5
 #              IMU PARAMETERS
 ##################################################
 ACCEL_RANGE = 2    	        # Plage de mesure de l'accéléromètre (g)
-ACCEL_FREQ = 52                 # Fréquence d'échantillonnage de l'accéléromètre (Hz)  
-GYRO_RANGE = 500                   # Plage de mesure du gyroscope (dps)
-GYRO_FREQ = 52                 # Fréquence d'échantillonnage du gyroscope (Hz)
+ACCEL_FREQ = 12.5                # Fréquence d'échantillonnage de l'accéléromètre (Hz)  
+GYRO_RANGE = 250                   # Plage de mesure du gyroscope (dps)
+GYRO_FREQ =12.5                # Fréquence d'échantillonnage du gyroscope (Hz)
+
+
+MAGNETO_RANGE=4               # Plage de mesure du magnétomètre (gauss)
+MAGNETO_FREQ=10                # Fréquence d'échantillonnage du magnétomètre (Hz)
 

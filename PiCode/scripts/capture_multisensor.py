@@ -15,7 +15,7 @@ from utils import Button, LED, create_acquisition_directory, CSVHandler
 from utils import CSVHandler
 from utils.LCD import LCD
 from config import*
-
+from sensors.IMU.magnetometer import read_magnetometer
 
 ACQUISITION_PATH = Path(ACQUISITION_ROOT)
 
@@ -59,11 +59,11 @@ def start_acquisition(state, led):
 
     path_gnss = session_dir / "gnss.csv"
     csv_gnss = CSVHandler(str(path_gnss))
-    csv_gnss.create_csv_with_header(header=["timestamp", "latitude", "longitude"])
+    csv_gnss.create_csv_with_header(header=["timestamp", "latitude", "longitude","hdop","vdop","pdop"])
 
     path_imu = session_dir / "imu.csv"
     csv_imu = CSVHandler(str(path_imu))
-    csv_imu.create_csv_with_header(header=["timestamp", "accel_x", "accel_y", "accel_z", "gyro_x", "gyro_y", "gyro_z"])
+    csv_imu.create_csv_with_header(header=["timestamp", "accel_x", "accel_y", "accel_z", "gyro_x", "gyro_y", "gyro_z","mag_x","mag_y","mag_z"])
 
     # Ajout des CSVHandlers créés dans state (pour y accéder en dehors de la fonction)
     state["csv_frames"] = csv_frames
@@ -118,7 +118,13 @@ def gnss_worker(state, lock, stop_event):
     """
     gnss = GNSS(1, GNSS_DEVICE_ADDR)
     gnss.initialisation(GNSS_MODES[MODE_GNSS])
-    lcd_display = LCD(LCD_DEVICE_ADDR)
+    try:
+        
+        lcd_display = LCD(LCD_DEVICE_ADDR)
+    except Exception : 
+        print("LCD indisponible")
+        lcd_display=None
+        
     while not stop_event.is_set():
         # Lecture d'une acquisition GNSS (timestamp, latitude, longitude, altitude)
         
@@ -135,14 +141,18 @@ def gnss_worker(state, lock, stop_event):
             continue
         latitude = gnss.latitude.coordinates_DD
         longitude = gnss.longitude.coordinates_DD
+        hdop = gnss.hdop
+        vdop = gnss.vdop
+        pdop = gnss.pdop
         print(f"Position GNSS : lat={latitude:.6f}, lon={longitude:.6f}")
-        lcd_display.effacer()
-        lcd_display.afficher(f"Lat:{latitude:.6f}\n\rLon:{longitude:.6f}")
+        if lcd_display is not None:
+            lcd_display.effacer()
+            lcd_display.afficher(f"Lat:{latitude:.6f}\n\rLon:{longitude:.6f}")
 
         with lock:
             if state["is_acquiring"]:
                 # Mise à jour du fichier timestamp avec la nouvelle acquisition (timestamp et chemin du fichier)
-                state["csv_gnss"].append_row([timestamp, latitude, longitude])
+                state["csv_gnss"].append_row([timestamp, latitude, longitude,hdop,vdop,pdop])
                 print(f"Acquisition GNSS enregistrée : {timestamp}, {latitude}, {longitude}")
                 state["gnss_index"] += 1
 
@@ -166,11 +176,16 @@ def imu_worker(state, lock, stop_event):
         gyro_y = 0.0
         gyro_z = 0.0
 
+        # Mise à jour du fichier timestamp avec la nouvelle acquisition (timestamp et chemin du fichier)
+        accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z = read_IMU(LSM6DSO_ADDR, ACCEL_RANGE, GYRO_RANGE)
+                
+        mag_x, mag_y, mag_z = read_magnetometer(LIS3MDL_ADDR, MAGNETO_RANGE)
+
         with lock:
             if state["is_acquiring"]:
-                # Mise à jour du fichier timestamp avec la nouvelle acquisition (timestamp et chemin du fichier)
-                accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z = read_IMU(LSM6DSO_ADDR, ACCEL_RANGE, GYRO_RANGE)
-                state["csv_imu"].append_row([timestamp, accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z])
+                
+        
+                state["csv_imu"].append_row([timestamp, accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z,mag_x,mag_y,mag_z])
                 state["imu_index"] += 1
 
         time.sleep(0.1)
