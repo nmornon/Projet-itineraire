@@ -43,7 +43,7 @@ def update_imu_position_tracking(accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro
 
 
     angle_change = gyro * dt
-    R_delta = Rz(angle_change[0])
+    R_delta = Rz(angle_change[0])@ Ry(angle_change[2]) @Rx(angle_change[1])
     player_polar_rotation += np.degrees(angle_change)
 
     R_world_to_lidar = R_world_to_lidar @ R_delta

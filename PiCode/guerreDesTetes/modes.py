@@ -18,6 +18,8 @@ ENEMY_SPAWN_ANGLE_MIN = -45
 ENEMY_SPAWN_ANGLE_MAX = 45
 ENEMY_SPAWN_RANGE_MIN = 900
 ENEMY_SPAWN_RANGE_MAX = 2500
+ENEMY_SPAWN_HEIGHT_MIN = -100
+ENEMY_SPAWN_HEIGHT_MAX = 100
 PROJECTILE_COOLDOWN_S = 0.25
 
 
@@ -138,10 +140,25 @@ def update_projectiles(projectiles, frame):
         if proj.getPosition()["r"] > MAP_MAX_RANGE:
             projectiles.remove(proj)
             continue
-        proj.move(100)
+        proj.move(150)
         proj.updateFrame()
         proj.render_image(frame)
 
+def check_collisions(projectiles, ennemis):
+    for proj in projectiles:
+        for ennemi in ennemis:
+            if is_collision(proj, ennemi):
+                projectiles.remove(proj)
+                ennemis.remove(ennemi)
+                break
+        
+                
+            
+def is_collision(proj, ennemi):
+    """Détermine si un projectile a touché un ennemi en fonction de leur position."""
+    pos_proj = proj.getPosition()
+    pos_ennemi = ennemi.getPosition()
+    return abs(pos_proj["theta"] - pos_ennemi["theta"]) < 3 and abs(pos_proj["r"] - pos_ennemi["r"]) < 200
 
 def spawn_enemy_if_needed(ennemis, heads, next_spawn_ts, now_ts=None):
     """Ajoute périodiquement un ennemi dans le cône frontal de la caméra."""
@@ -156,7 +173,7 @@ def spawn_enemy_if_needed(ennemis, heads, next_spawn_ts, now_ts=None):
         f"Ennemi{len(ennemis) + 1}",
         angle=random.uniform(ENEMY_SPAWN_ANGLE_MIN, ENEMY_SPAWN_ANGLE_MAX),
         profondeur=random.uniform(ENEMY_SPAWN_RANGE_MIN, ENEMY_SPAWN_RANGE_MAX),
-        z=random.uniform(-5, 5),
+        z=random.uniform(ENEMY_SPAWN_HEIGHT_MIN, ENEMY_SPAWN_HEIGHT_MAX),
         sprites=[sprite],
     )
     ennemis.append(ennemi)
@@ -171,7 +188,7 @@ def game_loop(state, lock, button, flask_display=None):
     draw_text_block(blank, ["Attente camera..."])
 
     heads = load_heads()
-    ennemis = []
+    ennemis = [Ennemi("EnnemiInitial", angle=0, profondeur=1500, z=0, sprites=[random.choice(heads) if heads else None])]
     projectiles = []
     next_enemy_spawn_ts = time.monotonic() + 0.5
     next_projectile_ts = 0.0
@@ -199,7 +216,10 @@ def game_loop(state, lock, button, flask_display=None):
             now_ts=now_ts,
         )
 
+        check_collisions(projectiles, ennemis)
+
         minimap = create_map_window(points, show_window=flask_display is None)
+
 
         for ennemi in ennemis:
             frame = ennemi.render(frame, minimap)

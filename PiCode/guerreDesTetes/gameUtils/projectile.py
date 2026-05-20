@@ -34,7 +34,7 @@ class Projectile(Entity):
             int(TAILLE_SPRITE_DEFAUT[1]),
         )
         distance = max(1.0, float(self.getPosition()["r"]))
-        facteur = max(0.1, min(3.0, 1200.0 / (distance + 200.0)))
+        facteur = max(0.1, min(3.0, 1200.0 / (distance*2.5 + 200.0)))
         return (
             int(TAILLE_SPRITE_DEFAUT[0] * facteur),
             int(TAILLE_SPRITE_DEFAUT[1] * facteur),
