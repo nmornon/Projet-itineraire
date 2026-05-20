@@ -16,7 +16,7 @@ def accelerometer_configuration(accel_range, accel_freq):
     # A COMPLETER
     bit1 = CONFIG_XL_FREQ[accel_freq]
     bit2 = CONFIG_XL_RANGE[accel_range]
-    print(bit1 * (2 ** 4) + bit2 * (2 ** 2))
+    #print(bit1 * (2 ** 4) + bit2 * (2 ** 2))
     return bit1 * (2 ** 4) + bit2 * (2 ** 2)
 
 def read_accelerometer(device_addr, accel_range):

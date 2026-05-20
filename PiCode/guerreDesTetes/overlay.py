@@ -7,11 +7,11 @@ def load_heads(size=(130,130), path="guerreDesTetes/selfies/"):
 
     heads=[]
 
-    files = [f for f in os.listdir(path) if f.endswith(".jpg") and f.startswith("sprite")]
+    files = [f for f in os.listdir(path) if f.startswith("sprite") and f.lower().endswith((".png", ".jpg", ".jpeg"))]
 
     for file in files :
 
-        img=cv2.imread(os.path.join(path, file))
+        img=cv2.imread(os.path.join(path, file), cv2.IMREAD_UNCHANGED)
 
         if img is None:
             print("impossible de charger : ",file)
@@ -28,13 +28,28 @@ def overlay_png_opacite(frame: np.ndarray, png: np.ndarray, x: int, y: int) -> n
     x = x - w // 2
     y = y - h // 2
 
-    bgr = png[:, :, :3].astype(float)
-    alpha = png[:, :, 3].astype(float) / 255.0
+    frame_h, frame_w = frame.shape[:2]
 
-    roi = frame[y : y + h, x : x + w].astype(float)
+    x1 = max(0, x)
+    y1 = max(0, y)
+    x2 = min(frame_w, x + w)
+    y2 = min(frame_h, y + h)
+
+    if x1 >= x2 or y1 >= y2:
+        return frame
+
+    png_x1 = x1 - x
+    png_y1 = y1 - y
+    png_x2 = png_x1 + (x2 - x1)
+    png_y2 = png_y1 + (y2 - y1)
+
+    bgr = png[png_y1:png_y2, png_x1:png_x2, :3].astype(float)
+    alpha = png[png_y1:png_y2, png_x1:png_x2, 3].astype(float) / 255.0
+
+    roi = frame[y1:y2, x1:x2].astype(float)
     for c in range(3):
         roi[:, :, c] = (alpha * bgr[:, :, c] + (1.0 - alpha) * roi[:, :, c])
-    frame[y : y + h, x : x + w] = roi.astype(np.uint8)
+    frame[y1:y2, x1:x2] = roi.astype(np.uint8)
     return frame
 
 def overlay_png(frame,png,x,y):
@@ -43,6 +58,9 @@ def overlay_png(frame,png,x,y):
         frame : image de la caméra 
         png : Image 
         x,y : position du centre de la tête sur l'écran (ou on veut l'afficher)"""
+
+    if png.shape[2] == 4:
+        return overlay_png_opacite(frame, png, x, y)
 
     hauteur,largeur=png.shape[:2]
 

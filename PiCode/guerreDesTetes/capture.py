@@ -11,7 +11,6 @@ def capture_face_sprite(frame):
     """
     Recup une photo et la transforme en visage.
     """
-    h, w = frame.shape[:2]
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     faces = _face_cascade.detectMultiScale(
@@ -32,8 +31,24 @@ def capture_face_sprite(frame):
     print(f"[capture] Visage détecté : x={x_min} y={y_min} w={box_width} h={box_height}")
 
     # Extraction du visage
-    sprite = frame[y_min:y_min + box_height, x_min:x_min + box_width]
-    sprite = cv2.resize(sprite, (SPRITE_SIZE, SPRITE_SIZE), interpolation=cv2.INTER_AREA)
+    face = frame[y_min:y_min + box_height, x_min:x_min + box_width]
+    face = cv2.resize(face, (SPRITE_SIZE, SPRITE_SIZE), interpolation=cv2.INTER_AREA)
+
+    sprite = cv2.cvtColor(face, cv2.COLOR_BGR2BGRA)
+    alpha = np.zeros((SPRITE_SIZE, SPRITE_SIZE), dtype=np.uint8)
+    axes = (int(SPRITE_SIZE * 0.42), int(SPRITE_SIZE * 0.49))
+    cv2.ellipse(
+        alpha,
+        (SPRITE_SIZE // 2, SPRITE_SIZE // 2),
+        axes,
+        0,
+        0,
+        360,
+        255,
+        -1,
+        lineType=cv2.LINE_AA,
+    )
+    sprite[:, :, 3] = alpha
 
     print(f"[capture] Sprite pret ({SPRITE_SIZE}x{SPRITE_SIZE} px).")
     return sprite

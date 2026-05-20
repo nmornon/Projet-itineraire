@@ -38,6 +38,12 @@ def polar_to_cartesian(angle_deg, depth_mm, z_mm):
     rad = math.radians(angle_deg)
     return np.array([depth_mm * math.sin(rad), depth_mm * math.cos(rad), float(z_mm)])
 
+def cartesian_to_polar(x_mm, y_mm, z_mm):
+    """Coordonnées cartésiennes à polaires LiDAR. Retourne (angle_deg, depth_mm, z_mm)."""
+    angle_rad = math.atan2(x_mm, y_mm)
+    depth_mm = math.sqrt(x_mm**2 + y_mm**2)
+    return math.degrees(angle_rad), depth_mm, z_mm
+
 
 def project_point_world_to_image(point_world, H_w_to_lidar=np.eye(4)):
     """Projette un point cartésien monde vers un pixel image. Retourne None si hors champ."""

@@ -1,11 +1,11 @@
-import cv2
-import numpy as np
-from flask import Flask, Response, redirect
 import threading
-import time
+
+import cv2
+from flask import Flask, Response, redirect
 
 app = Flask(__name__)
 _current_frame = None
+_server_started = False
 
 def set_preview_frame(frame):
     global _current_frame
@@ -26,10 +26,18 @@ def index():
 def video():
     return Response(_generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-# Lance Flask dans un thread séparé pour ne pas bloquer ton code
-threading.Thread(target=lambda: app.run(host='0.0.0.0', port=8080), daemon=True).start()
+def start_preview_server(host='0.0.0.0', port=5000):
+    global _server_started
+    if _server_started:
+        return
+    _server_started = True
+    threading.Thread(target=lambda: app.run(host=host, port=port), daemon=True).start()
 
 if __name__ == '__main__':
+    import numpy as np
+    import time
+
+    start_preview_server()
     print("Stream dispo sur http://0.0.0.0:5000/video")
     i = 0
     while True:

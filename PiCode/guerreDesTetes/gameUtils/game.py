@@ -4,20 +4,42 @@ from guerreDesTetes.overlay import overlay_png
 from guerreDesTetes.gameUtils.projections import *
 from guerreDesTetes.gameUtils.imu_position_tracking import get_imu_H_w_to_lidar
 
+TAILLE_SPRITE_DEFAUT = (128, 128)
+
 class Entity:
-    def __init__(self, nom, position=[0, 0, 0], sprite=None):
+    def __init__(self, nom, position=[0, 0, 0], sprites=None):
         self.nom = nom
-        self.sprite = sprite
+        self.sprites = sprites
+        self.current_sprite_index = 0
         self._position = {"theta": position[0] % 360, "r": position[1], "z": position[2]} # coordonnées polaires (angle en degrés, profondeur en mm, z en mm)
 
-    def setSprite(self, sprite):
-        self.sprite = sprite
+    def setSprite(self, sprites):
+        self.sprites = sprites
 
     def getPosition(self):
         return self._position
 
     def setPosition(self, theta, r, z):
         self._position = {"theta": theta % 360, "r": r, "z": z}
+
+    def _calculate_sprite_size(self):
+        if (self.getPosition()["r"] == 0) : return (
+            int(TAILLE_SPRITE_DEFAUT[0]),
+            int(TAILLE_SPRITE_DEFAUT[1]),
+        )
+        distance = max(1.0, float(self.getPosition()["r"]))
+        facteur = max(0.1, min(3.0, 1200.0 / (distance + 200.0)))
+        return (
+            int(TAILLE_SPRITE_DEFAUT[0] * facteur),
+            int(TAILLE_SPRITE_DEFAUT[1] * facteur),
+        )
+    
+    def getCurrentSprite(self):
+        if not self.sprites:
+            return None
+        sprite_brut = self.sprites[self.current_sprite_index]
+        taille = self._calculate_sprite_size()
+        return cv2.resize(sprite_brut, taille)
 
     def render_image(self, frame):
         """Projette et affiche l'ennemi sur frame. Retourne frame modifié."""
@@ -32,8 +54,8 @@ class Entity:
             return frame
         u, v = result
         #print(f"Ennemi {self.nom} projeté en (u={u}, v={v}), angle ={pos['theta']:.1f}°, profondeur={pos['r']:.1f}mm")
-        if self.sprite is not None:
-            return overlay_png(frame, self.sprite, u, v)
+        if self.sprites is not None:
+            return overlay_png(frame, self.getCurrentSprite(), u, v)
         cv2.drawMarker(frame, (u, v), (0, 0, 255), cv2.MARKER_CROSS, 20, 2)
         return frame
 
@@ -51,11 +73,11 @@ class Entity:
         z = int(pos["z"] / 100)
         cv2.circle(lidar_map, (x, lidar_map.shape[0] // 2 - y), max(5, min(20, 2000 // pos["r"])), color, -1)
         return lidar_map
-    
+
 
 class Ennemi(Entity):
-    def __init__(self, nom, angle, profondeur, z, vie=3, sprite=None):
-        super().__init__(nom, [angle, profondeur, z], sprite=sprite)
+    def __init__(self, nom, angle, profondeur, z, vie=3, sprites=None):
+        super().__init__(nom, [angle, profondeur, z], sprites=sprites)
         self.vie = vie
 
     def wander(self, power=1):

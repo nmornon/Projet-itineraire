@@ -64,4 +64,4 @@ def read_IMU(XL_addr, accel_range, gyro_range):
     accel_x,accel_y,accel_z = read_accelerometer(XL_addr, accel_range)
     gyro_x,gyro_y,gyro_z = read_gyroscope(XL_addr, gyro_range)
     
-    return accel_x,accel_y,accel_z,gyro_x,gyro_y,gyro_z
+    return accel_x,accel_y,accel_z,gyro_x-0.3479141835518474,gyro_y+0.300357568533969,gyro_z-0.2708224076281287 #reduction du biais de l'imu

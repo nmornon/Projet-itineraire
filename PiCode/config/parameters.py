@@ -103,6 +103,10 @@ CAMERA_SATURATION = 1.0
 #   2.0 → netteté accentuée
 CAMERA_SHARPNESS = 1.0
 
+# Angle total du champ de vision caméra utilisé pour la minimap LiDAR.
+# La ligne centrale correspond à l'axe LiDAR angle 0.
+CAMERA_FOV_DEGREES = 12.5
+
 ##################################################
 #              IMU PARAMETERS
 ##################################################
