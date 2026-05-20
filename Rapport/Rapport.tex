@@ -108,7 +108,7 @@ La matrice de changement de base est exprimée en fonction de $k$ car celle-ci �
 Dans la base de l'IMU, on utilise 3 estimateurs de biais pour l'accéléromètre, qui sont $b_{a,x}$, $b_{a,y}$ et $b_{a,z}$ de la forme $\frac1N \sum_{k=0}^{N} a_{k,i}$, avec $i \in \{x, y, z\}$ et $N$ le nombre de mesures utilisés durant la calibration. La plaque est bien immobile sur le sol.
 
 \subsubsection{Biais gyroscope}
-Dans la base de l'IMU, on utilise 3 estimateurs de biais pour le gyroscope, qui sont $b_{g,\theta}$, $b_{g,\phi}$ et $b_{g,\psi}$ de la forme $\frac1N \sum_{k=0}^{N} a_{k,i}$ avec $i \in \{\theta, \phi, \psi\}$ et N le nombre de mesures utilisés durant la calibration. La plaque est bien immobile sur le sol.
+Dans la base de l'IMU, on utilise 3 estimateurs de biais pour le gyroscope, qui sont $b_{g,\theta}$, $b_{g,\phi}$ et $b_{g,\psi}$ de la forme $\frac1N \sum_{k=0}^{N} \omega_{k,i}$ avec $i \in \{\theta, \phi, \psi\}$ et N le nombre de mesures utilisés durant la calibration. La plaque est bien immobile sur le sol.
 
 \subsubsection{Calibration}
 Avec notre capteur GNSS et un traitement du signal pour enlever les valeurs aberrantes on obtient $\bar{\lambda}_0$ et $\bar{\varphi}_0$. De même avec le gyroscope on a $\bar{\omega}_{\theta,0}$, $\bar{\omega}_{\phi,0}$, $\bar{\omega}_{\psi,0}$. Et avec l'accéléromètre on a $\bar{a}_{\lambda,0} = 0$ et $\bar{a}_{\varphi,0} = 0$ une fois le biais sur l'accélération retiré.
@@ -132,10 +132,10 @@ avec :
 \[
 \begin{aligned}
     \mathbf w_k \sim \mathcal{N}(0, \mathbf Q_k), \\
-    \mathbf v_k \sim \mathcal{N}(0, \mathbf R_k)
+    \mathbf v_k \sim \mathcal{N}(0, \mathbf R)
 \end{aligned}
 \]
-$\mathbf Q_k$ le bruit de commande et $\mathbf R_k$ le bruit de mesure, ces matrices seront définies plus loin.
+$\mathbf Q_k$ le bruit de commande et $\mathbf R$ le bruit de mesure, ces matrices seront définies plus loin.
 
 On décide de poser le vecteur d'état :
 \[
@@ -170,22 +170,22 @@ Et le vecteur de commande :
 \]
 qui consiste en les valeurs mesurées par l'IMU qui interviennent dans la prédiction modèle. 
 
-On peut encore une fois remarquer que les accélérations dans le vecteur de commande ne correspondent pas à nos mesures réelles. En effet, à chaque itération on appliquera la matrice de changement de base spécifiée plus tôt pour retrouver nos accélérations dans la base de l'ENU en coordonnées sphériques. Il en va de même pour nos biais capteurs. On n'oubliera surtout pas que cette matrice évolue au cours des itérations, on estimera les angles avec des développements limités et c'est pour cela que l'on a fait le choix de mettre les angles $\theta$, $\phi$ et $\psi$ dans notre vecteur d'état malgré le fait qu'ils ne soient pas utilisés dans EKF pour estimer $\lambda$ et $\varphi$.
+On peut encore une fois remarquer que les accélérations dans le vecteur de commande ne correspondent pas à nos mesures réelles. En effet, à chaque itération on appliquera la matrice de changement de base spécifiée plus tôt pour retrouver nos accélérations dans la base de l'ENU en coordonnées sphériques. Il en va de même pour nos biais capteurs. On n'oubliera surtout pas que cette matrice évolue au cours des itérations, on estimera les angles avec des développements limités et c'est pour cela que l'on a fait le choix de mettre les angles $\theta$, $\phi$ et $\psi$ dans notre vecteur d'état malgré le fait qu'ils ne soient pas directement utilisés dans EKF pour estimer $\lambda$ et $\varphi$.
 
 \subsubsection{Fonctions f et h}
 Nous allons déterminer la fonction $f$ en utilisant des développements limités que voici :
 \[
 \begin{aligned}
     \mathbf x_k &= f(\mathbf x_{k-1}, \mathbf u_{k-1}) + \mathbf w_{k-1} \\
-                 &=
+                &=
     \begin{pmatrix}
         \lambda_{k-1} + \Delta t_k \cdot v_{\lambda,k-1} + \frac{\Delta t^2_k}{2} \cdot (a_{\lambda,k-1} - b_{a,\lambda}) \\
         \varphi_{k-1} + \Delta t_k \cdot v_{\varphi,k-1} + \frac{\Delta t^2_k}{2} \cdot (a_{\varphi,k-1} - b_{a,\varphi}) \\
-        v_{\lambda,k-1} + \Delta t_{k-1} \cdot (a_{\lambda,k-1} - b_{a,\lambda}) \\
-        v_{\varphi,k-1} + \Delta t_{k-1} \cdot (a_{\varphi,k-1} - b_{a,\varphi}) \\
-        \theta_{k-1} + \Delta t_{k-1} \cdot (\omega_{\theta,k-1} - b_{g,\theta}) \\
-        \phi_{k-1} + \Delta t_{k-1} \cdot (\omega_{\phi,k-1} - b_{g,\phi}) \\
-        \psi_{k-1} + \Delta t_{k-1} \cdot (\omega_{\psi,k-1} - b_{g,\psi}) \\
+        v_{\lambda,k-1} + \Delta t_k \cdot (a_{\lambda,k-1} - b_{a,\lambda}) \\
+        v_{\varphi,k-1} + \Delta t_k \cdot (a_{\varphi,k-1} - b_{a,\varphi}) \\
+        \theta_{k-1} + \Delta t_k \cdot (\omega_{\theta,k-1} - b_{g,\theta}) \\
+        \phi_{k-1} + \Delta t_k \cdot (\omega_{\phi,k-1} - b_{g,\phi}) \\
+        \psi_{k-1} + \Delta t_k \cdot (\omega_{\psi,k-1} - b_{g,\psi}) \\
         b_{a,\lambda,k-1} \\
         b_{a,\varphi,k-1} \\
         b_{g,\theta,k-1} \\
@@ -200,7 +200,7 @@ Et maintenant la fonction $h$ en utilisant simplement le capteur GNSS :
 \[
 \begin{aligned}
     \mathbf y_k &= h(\mathbf x_k) + \mathbf v_k \\
-                 &=
+                &=
     \begin{pmatrix}
         \lambda_k \\
         \varphi_k
@@ -213,15 +213,8 @@ Et maintenant la fonction $h$ en utilisant simplement le capteur GNSS :
 Par définition $\mathbf F$ et $\mathbf H$ sont les jacobiennes de $f$ et $h$ respectivement, voici leur notation :
 \[
 \begin{aligned}
-    \mathbf F_k &=
-    \left.
-    \frac{\partial f}{\partial x}
-    \right|_{x_{k-1|k-1},\,u_{k-1}},
-    \\[1em]
-    \mathbf H_k &=
-    \left.
-    \frac{\partial h}{\partial x}
-    \right|_{x_{k|k-1}}
+    \mathbf F_k &= \frac{\partial f}{\partial \mathbf x} \Big|_{x_{k-1|k-1}, \, u_{k-1}}, \\
+    \mathbf H_k &= \frac{\partial h}{\partial \mathbf x} \Big|_{x_{k|k-1}}
 \end{aligned}
 \]
 avec $\mathbf x_{k-1|k-1}$ l'état à priori (prédiction + correction) à l'instant $k-1$ et $\mathbf x_{k|k-1}$ l'état prédit à l'instant $k$ avant correction.
@@ -231,11 +224,11 @@ Après avoir défini ces matrices, on peut passer à leur expression :
 \begin{aligned}
     \mathbf F_k &=
     \begin{pmatrix}
-        I_2 & \Delta t_k I_2 & 0_{2\times3} & -\frac{\Delta t_k^2}{2} I_2 & 0_{2\times3} \\
-        0_{2\times2} & I_2 & 0_{2\times3} & -\Delta t_k I_2 & 0_{2\times3} \\
-        0_{3\times2} & 0_{3\times2} & I_3 & 0_{3\times2} & -\Delta t_k I_3 \\
-        0_{2\times2} & 0_{2\times2} & 0_{2\times3} & I_2 & 0_{2\times3} \\
-        0_{3\times2} & 0_{3\times2} & 0_{3\times3} & 0_{3\times2} & I_3
+        \mathbf I_2 & \Delta t_k \mathbf I_2 & \mathbf 0_{2\times3} & -\frac{\Delta t_k^2}{2} \mathbf I_2 & \mathbf 0_{2\times3} \\
+        \mathbf 0_{2\times2} & \mathbf I_2 & 0_{2\times3} & -\Delta t_k \mathbf I_2 & \mathbf 0_{2\times3} \\
+        \mathbf 0_{3\times2} & \mathbf 0_{3\times2} & \mathbf I_3 & \mathbf 0_{3\times2} & -\Delta t_k \mathbf I_3 \\
+        \mathbf 0_{2\times2} & \mathbf 0_{2\times2} & \mathbf 0_{2\times3} & \mathbf I_2 & \mathbf 0_{2\times3} \\
+        \mathbf 0_{3\times2} & \mathbf 0_{3\times2} & \mathbf 0_{3\times3} & \mathbf 0_{3\times2} & \mathbf I_3
     \end{pmatrix},
     \\[1em]
     \mathbf H_k &= \mathbf H =
@@ -248,30 +241,50 @@ On peut interprêter $\mathbf F$ comme la matrice qui représente la dynamique d
 
 On pourrait penser que l'on s'est trompé sur la non linéarité de notre système mais on doit se rappeler que celle-ci se cache dans notre matrice de rotation.
 
-\subsubsection{Propagation de la covariance}
-$\mathbf P_{k|k-1}$ est la matrice de covariance (avant correction) du vecteur $\mathbf x$ dont le terme générique est donné par $p_{i,j} = \operatorname{Cov}(x_i, x_j)$ où $\operatorname{Cov}(x,y) = \frac{1}{N-1} \sum_{i=1}^{N} (x_i-\bar{x})(y_i-\bar{y})$, l'estimateur empirique non biaisé. Elle est calculée itérativement de la manière suivante :
+\subsubsection{Matrice Q}
+En reprenant la forme d'un système dynamique on a vu que l'on observait du bruit de processus $\mathbf w_{k-1}$ (modèle) et du bruit de mesure $\mathbf v_k$ (capteur) suivant des lois de la forme :
 \[
-\mathbf P_{k|k-1} = \mathbf F_k \mathbf P_{k-1|k-1} \mathbf F_k^\top + \mathbf Q_k
+\begin{aligned}
+    \mathbf w_k \sim \mathcal{N}(0, \mathbf Q_k), \\
+    \mathbf v_k \sim \mathcal{N}(0, \mathbf R)
+\end{aligned}
+\]
+les matrices $\mathbf Q_k$ et $\mathbf R$ représentant les matrices de covariance du bruit.
+
+On peut remarquer que depuis le début $\mathbf R$ ne dépendait pas de $k$, la raison est que l'on n'opère aucune transformation dans la fonction $h$ sur les mesures de notre capteur GNSS. On ne s'intéresse alors qu'à l'expression de $\mathbf Q_k$. Initialement on a : 
+\[
+\mathbf Q_0 = \operatorname{diag}\left(\sigma_{a, \lambda, 0}^2, \, \sigma_{a, \varphi, 0}^2, \, \sigma_{\omega, \theta, 0}^2, \, \sigma_{\omega, \phi, 0}^2, \, \sigma_{\omega, \psi, 0}^2 \right)
+\]
+On pose ensuite la matrice :
+\[
+\begin{aligned}
+\mathbf \Gamma_k &= \frac{\partial f}{\partial \mathbf u} \Big|_{x_{k|k}, \, u_k} \\
+                 &=
+    \begin{pmatrix}
+        \frac{\Delta t_k^2}{2} \mathbf I_2 & \mathbf 0_{2\times3} \\
+        \Delta t_k \mathbf I_2 & \mathbf 0_{2\times3} \\
+        \mathbf 0_{3\times2} & \Delta t_k \mathbf I_3 \\
+        \mathbf 0_{5\times2} & \mathbf 0_{5\times3}
+    \end{pmatrix}
+\end{aligned}
+\]
+Puis de manière itérative on pose :
+\[
+\mathbf Q_k = \mathbf \Gamma_k \, \mathbf Q_0 \, \mathbf \Gamma_k^\top
+\]
+
+\subsubsection{Propagation de la covariance}
+$\mathbf P_{k|k-1}$ est la matrice de covariance (avant correction) du vecteur $\mathbf x$. Elle est calculée itérativement de la manière suivante :
+\[
+\mathbf P_{k|k-1} = \mathbf F_k \, \mathbf P_{k-1|k-1} \, \mathbf F_k^\top + \mathbf Q_k
 \]
 avec comme cas initial :
 \[
-\begin{aligned}
-    \mathbf P_{0|0} &=
-    \begin{pmatrix}
-        \operatorname{Var}(\lambda_0) & \operatorname{Covar}(\lambda_0, \varphi_0) & \cdots & \operatorname{Covar}(\lambda_0, b_{g,\psi,0}) \\
-        \operatorname{Covar}(\varphi_0, \lambda_0) & \ddots & \cdots & \vdots \\
-        \vdots & \vdots & \ddots & \vdots \\
-        \operatorname{Covar}(b_{g,\psi,0}, \lambda_0) & \cdots & \cdots & \operatorname{Var}(b_{g,\psi,0})
-    \end{pmatrix} 
-    \\[1em]
-                     &= \frac{1}{N-1} \sum_{i=1}^{N}
-    \begin{pmatrix}
-        (\lambda_{0,i} - \bar{\lambda}_0)^2 & (\lambda_{0,i} - \bar{\lambda}_0)(\varphi_{0,i} - \bar{\varphi}_0) & \cdots & (\lambda_{0,i} - \bar{\lambda}_0)(b_{g,\psi,0,i} - \bar{b}_{g,\psi,0}) \\
-        (\varphi_{i,0} - \bar{\varphi}_0)(\lambda_{i,0} - \bar{\lambda}_0) & \ddots & \cdots & \vdots \\
-        \vdots & \vdots & \ddots & \vdots \\
-        (b_{g,\psi,0,i} - \bar{b}_{g,\psi,0})(\lambda_{0,i} - \bar{\lambda}_0) & \cdots & \cdots & (b_{g,\psi,0,i} - \bar{b}_{g,\psi,0})^2
-    \end{pmatrix}
-\end{aligned}
+\mathbf P_{0|0} = \operatorname{diag}\left(\sigma_{\lambda,0}^2, \, \sigma_{\varphi,0}^2, \, \sigma_{v_\lambda,0}^2, \, \sigma_{v_\varphi,0}^2, \, \sigma_{\theta,0}^2, \, \sigma_{\phi,0}^2, \, \sigma_{\psi,0}^2, \, \sigma_{b_{a,\lambda}}^2, \, \sigma_{b_{a,\varphi}}^2, \, \sigma_{b_{g,\theta}}^2, \, \sigma_{b_{g,\phi}}^2, \, \sigma_{b_{g,\psi}}^2 \right)
+\]
+et les $\sigma^2$ étant calculés à l'aide de l'estimateur empirique non biaisé de la variance qui est de la forme :
+\[
+\sigma_z = \frac{1}{N-1} \sum_{i=1}^{N} (z_i - \bar{z})^2
 \]
 
 \subsubsection{Innovation et covariance de l'innovation}
@@ -282,48 +295,40 @@ L'innovation $\mathbf r_k$ est la différence entre notre mesure $\mathbf y_k$ e
 De plus, la covariance de l'innovation est calculée itérativement de la manière suivante :
 \[
 \begin{aligned}
-    \mathbf S_k &= \mathbf H_k \mathbf P_{k|k-1} \mathbf H_k^\top + \mathbf R_k \\
-                &= \mathbf H \mathbf P_{k|k-1} \mathbf H^\top + \mathbf R_k
+    \mathbf S_k &= \mathbf H_k \, \mathbf P_{k|k-1} \, \mathbf H_k^\top + \mathbf R \\
+                &= \mathbf H \, \mathbf P_{k|k-1} \, \mathbf H^\top + \mathbf R
     \quad \text{car } \mathbf H_k = \mathbf H
 \end{aligned}
 \]
 avec comme cas initial :
 \[
-\mathbf S_0 = \mathbf H \mathbf P_{0|0} \mathbf H^\top + \mathbf R_0
+\mathbf S_0 = \mathbf H \, \mathbf P_{0|0} \, \mathbf H^\top + \mathbf R_0
 \]
 
 \subsubsection{Gain de Kalman K}
 Le gain de Kalman $\mathbf K_k$ est une matrice qui représente, à l'itération $k$, si l'on devrait plutôt faire confiance aux mesures de notre capteur GNSS ou aux prédictions de notre modèle. On l'exprime ainsi :
 \[
 \begin{aligned}
-    \mathbf K_k &= \mathbf P_{k|k-1} \mathbf H_k^\top \mathbf S_k^{-1} \\
-                &= \mathbf P_{k|k-1} \mathbf H^\top \mathbf S_k^{-1}
+    \mathbf K_k &= \mathbf P_{k|k-1} \, \mathbf H_k^\top \, \mathbf S_k^{-1} \\
+                &= \mathbf P_{k|k-1} \, \mathbf H^\top \, \mathbf S_k^{-1}
     \quad \text{car } \mathbf H_k = \mathbf H
 \end{aligned}
 \]
 avec comme cas initial :
 \[
-\mathbf K_0 = \mathbf P_{0|0} \mathbf H^\top \mathbf S_0^{-1}
+\mathbf K_0 = \mathbf P_{0|0} \, \mathbf H^\top \, \mathbf S_0^{-1}
 \]
 
 \subsubsection{Correction}
 Une fois le gain de Kalman calculé il ne nous reste plus qu'à corriger notre prédiction de cette manière :
 \[
 \begin{aligned}
-    \mathbf x_{k|k} &= \mathbf x_{k|k-1} + \mathbf K_k \mathbf r_k, \\
-    \mathbf P_{k|k} &= (\mathbf I - \mathbf K_k \mathbf H_k) \mathbf P_{k|k-1}
+    \mathbf x_{k|k} &= \mathbf x_{k|k-1} + \mathbf K_k \, \mathbf r_k, \\
+    \mathbf P_{k|k} &= (\mathbf I - \mathbf K_k \, \mathbf H_k) \, \mathbf P_{k|k-1}
 \end{aligned}
 \]
 
-\subsubsection{Matrices Q et R}
-En reprenant la forme d'un système dynamique on a vu que l'on observait du bruit de processus $\mathbf w_{k-1}$ (modèle) et du bruit de mesure $\mathbf v_k$ (capteur) suivant des lois de la forme :
-\[
-\begin{aligned}
-    \mathbf w_k \sim \mathcal{N}(0, \mathbf Q_k), \\
-    \mathbf v_k \sim \mathcal{N}(0, \mathbf R_k)
-\end{aligned}
-\]
-Les matrices $\mathbf Q_k$ et $\mathbf R_k$ représentent les matrices de covariance du bruit.
+\subsubsection{Synchronisation}
 
 \section{Partie 2}
 
