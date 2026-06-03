@@ -1,296 +1,150 @@
 \documentclass{article}
-
 % Encodage
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[french]{babel}
-
 % Mise en page
 \usepackage{geometry}
 \geometry{margin=2cm}
-
 % Package Maths
 \usepackage{amsmath}
-
 % Package unités SI
 \usepackage{siunitx}
 \DeclareSIUnit{\gauss}{G}
 \DeclareSIUnit{\tesla}{T}
-
 % Package Hyperlien
 \usepackage{hyperref}
-
 \title{Projet Intégratif : Itinéraire}
 \author{Adam EL MARZOUKI \and Noémie MORNON \and Théo SAVARY \and Roger-Parfait MBAITORNDIA \and Axel LÊ TRONG}
 \date{\today}
-
 \begin{document}
-
 \maketitle
-
 \tableofcontents
 \newpage
-
 \section{Introduction}
-
 \section{Partie 1}
-On commence par poser notre plaque sur le sol et prendre une série de mesures avec l'accéléromètre et le magnétomètre.
+\subsection{Objectif}
+L'objectif de cette partie est de développer un système autonome d'acquisition et de traitement de données permettant d'estimer la trajectoire d'un utilisateur à partir de plusieurs capteurs embarqués sur l'ITIPhone. Nous avions plusieurs capteurs à disposition. Afin de concevoir un algorithme de navigation adapté au cahier des charges, nous avons choisi d'utiliser uniquement le GPS et l'IMU.
+De plus, nous avons fait l'hypothèse que l'ITIPhone reste positionné à plat tout au long du trajet. Les rotations autour de l'axe y et x sont donc négligeables. La dynamique angulaire est réduite à une rotation autour de l'axe vertical $\mathbf{z}$. 
+Bien que le GPS fournisse une position correcte extérieur, il reste sensible aux perturbations environnementales et peut produire des mesures bruitées ou aberrantes. L'idée est donc de combiner les informations du GPS avec celles fournies par l'IMU à l'aide du filtre de Kalman . 
 
-\subsection{Changement de base}
-Grâce à nos mesures on trouve la matrice de rotation entre la base de l'IMU et la base ENU. Détaillons notre raisonnement : en considérant l'orientation de notre accéléromètre sur la plaque on sait qu'au repos on devrait mesurer (\href{https://www.st.com/resource/en/datasheet/lsm6dso.pdf}{doc du capteur avec figure des axes}) :
-\[
-\mathbf a_{xyz} = 
-\begin{pmatrix}
-    \|g\|_2 \\
-    0 \\
-    0
-\end{pmatrix}
-\quad \text{avec } \|g\|_2 = \SI{9.81}{m\per\second\squared}
-\]
+\subsection{Analyse préliminaire des données GPS}
+Avant la mise en place du filtre, nous avons étudié les données GNSS obtenues lors des différentes acquisitions. Nous avons observé qu'avec une météo ensoleillée, le GPS fournissait déja des positions relativement précises. En revanche, certaines mesures avaient des sauts importants dus à des erreurs de réception. Ces erreurs étaient importantes lorsqu'on se trouvait à proximité d'obstacles ou à l'intérieur d'un batiment. Afin de limiter leur impact nous avons mis en place une étape de nettoyage des mesures GNSS
 
-Or cela n'est pas ce que l'on observe, et c'est cette légère différence statique qui nous permet d'estimer les angles d'Euler tel que le tangage initial $\theta_0$ associé à la rotation autour de l'axe $\mathbf y$ et le roulis initial $\phi_0$ associé à la rotation autour de l'axe $\mathbf z$ grâce à des projections et de nos chers formules de trigonométries. Voici l'expression des angles obtenue :
-\[
-\begin{aligned}
-    \theta_0 = \arcsin\!\left(\frac{b_{a,z}}{\|g\|_2}\right), \\
-    \phi_0 = \arccos\!\left(\frac{b_{a,x}}{\|g\|_2}\right)
-\end{aligned}
-\]
-avec les $b_a$ les biais sur l'accélérations définis dans la partie suivante.
+\subsection{Suppression des points aberrants}
+Pour détecter les mesures aberrantes, nous avons calculé pour chaque point : 
+\begin{itemize}
+    \item la distance au point précédent;
+    \item la distance au point suivant;
+    \item la distance entre les deux points
+\end{itemize}
 
-Vous avez sûrement remarqué l'absence d'une troisième variable, le lacet initial $\psi_0$ associé à la rotation autour de l'axe $\mathbf x$. En effet, il ne peut être estimé car confondu avec ce même axe, c'est ici qu'intervient le magnétomètre qui nous permettra, en extérieur  et sans perturbations électro-magnétiques, de nous indiquer le nord magnétique de la Terre. Pour cela il faut installer le magnétomètre de telle manière à ce qu'il partage sa base avec celle de l'IMU (\href{https://www.st.com/resource/en/datasheet/lis3mdl.pdf}{voir doc magnétomètre}). On procédera ensuite de la même manière grâce à des projections bien pensées pour trouver notre lacet initial. On exprime l'angle ainsi :
-\[
-\psi_0 = \operatorname{arctan2}\!\left(\frac{b_{m,z}}{b_{m,y}}\right)
-\quad \text{avec } \mathbf b_m \, \text{le biais du magnétomètre en gauss}
-\]
-sachant que $\SI{1}{\gauss} = \SI{10e-4}{\tesla}$.
+Un point est considéré comme aberrant lorsqu'il est éloigné de ses deux voisins, mais les deux voisins eux sont cohérents entre eux. Cette étape nous permet donc d'éliminer les sauts ponctuels du GPS avant leur utilisation.
 
-On a alors la matrice : $\mathbf R_{IMU \rightarrow ENU,k(\phi_k, \theta_k, \psi_k)} = \mathbf R_x(\phi_k) \cdot \mathbf R_y(\theta_k) \cdot \mathbf R_z(\psi_k)$ avec : 
+\subsection{Changement de repère et projection}
+Les coordonnées GNSS sont exprimées en coordonnées sphériques sous la forme latitude/longitude. Ce format est adapté à l'affichage cartographique mais peut adapté pour les calculs. Nous avons donc converti les positions dans un repère cartésien exprimé en mètres. Le premier point de l'acquisition est utilisé comme origine du repère.  Les coordonnées locales sont obtenues par : 
 \[
 \begin{aligned}
-    \mathbf R_x(\phi_k) &= 
-    \begin{pmatrix}
-        1 & 0 & 0 \\
-        0 & \cos(\phi_k) & -\sin(\phi_k) \\
-        0 & \sin(\phi_k) & \cos(\phi_k)
-    \end{pmatrix},
-    \\[1em]
-    \mathbf R_y(\theta_k) &= 
-    \begin{pmatrix}
-        \cos(\theta_k) & 0 & \sin(\theta_k) \\
-        0 & 1 & 0 \\
-        -\sin(\theta_k) & 0 & \cos(\theta_k)
-    \end{pmatrix},
-    \\[1em]
-    \mathbf R_z(\psi_k) &= 
-    \begin{pmatrix}
-        \cos(\psi_k) & -sin(\psi_k) & 0 \\
-        \sin(\psi_k) & \cos(\psi_k) & 0 \\
-        0 & 0 & 1
-    \end{pmatrix}
+x &= \text{rad}(\text{lon}-\text{lon}_0) \cdot R_{\text{earth}} \cdot \cos(\text{rad}(\text{lat}_0)) \\
+y &= \text{rad}(\text{lat}-\text{lat}_0) \cdot R_{\text{earth}}
 \end{aligned}
 \]
-On a alors la formule de changement de base suivante :
+où $R_{\text{earth}} = \SI{6371000}{m}$ représente le rayon moyen de la Terre et $\text{rad}(\cdot)$ la conversion en radians.
+
+\subsection{Calibration et estimation des biais}
+
+Lors des premiers essais, nous avons rapidement constaté que l'utilisation directe des mesures de l'IMU provoquait une dérive importante de la trajectoire estimée. Pour corriger ce défaut, nous avons réaliser plusieurs acquisitions en laissant le système immobile. Dans ces conditions, les accélérations et vitesses angulaires mesurées devraient théoriquement être nulles ( ou égales à la gravité ). Les écarts observées correspondent donc aux biais des capteurs. Nous avons estimé ces biais à partir de la moyenne empirique des acquisitions immobiles enregistrées : 
+
 \[
-\mathbf a_{ENU,k} = \mathbf R_{IMU \rightarrow ENU,k}(\phi_k, \theta_k, \psi_k) \cdot \mathbf a_{IMU,k}
+b_{a,x}=\frac1N\sum_{k=1}^{N}a_{x,k}
 \]
 
-La matrice de changement de base est exprimée en fonction de $k$ car celle-ci évoluera au cours du trajet par l'estimation de nos angles dans le filtre de Kalman.
-
-\subsection{Calibration}
-
-\subsubsection{Biais accéléromètre}
-Dans la base de l'IMU, on utilise 3 estimateurs de biais pour l'accéléromètre, qui sont $b_{a,x}$, $b_{a,y}$ et $b_{a,z}$ de la forme $\frac1N \sum_{k=0}^{N} a_{k,i}$, avec $i \in \{x, y, z\}$ et $N$ le nombre de mesures utilisés durant la calibration. La plaque est bien immobile sur le sol.
-
-\subsubsection{Biais gyroscope}
-Dans la base de l'IMU, on utilise 3 estimateurs de biais pour le gyroscope, qui sont $b_{g,\theta}$, $b_{g,\phi}$ et $b_{g,\psi}$ de la forme $\frac1N \sum_{k=0}^{N} \omega_{k,i}$ avec $i \in \{\theta, \phi, \psi\}$ et N le nombre de mesures utilisés durant la calibration. La plaque est bien immobile sur le sol.
-
-\subsubsection{Biais magnétomètre}
-Dans la base de l'IMU, on utilise 3 estimateurs de biais pour le magnétomètre, qui sont $b_{m,\theta}$, $b_{m,\phi}$ et $b_{m,\psi}$ de la forme $\frac1N \sum_{k=0}^{N} m_{k,i}$ avec $i \in \{x, y, z\}$ et N le nombre de mesures utilisés durant la calibration. La plaque est bien immobile sur le sol.
-
-\subsubsection{Calibration}
-Avec notre capteur GNSS et un traitement du signal pour enlever les valeurs aberrantes on obtient $\bar{E}_0$ et $\bar{N}_0$. De même avec le gyroscope on a $\bar{\omega}_{\theta,0}$, $\bar{\omega}_{\phi,0}$, $\bar{\omega}_{\psi,0}$. Et avec l'accéléromètre on a $\bar{a}_{E,0} = 0$ et $\bar{a}_{N,0} = 0$ une fois le biais sur l'accélération retiré.
-
-En utilisant des développements limités et les timestamps de nos mesures on retrouve une approximation de $\bar{v}_{E,0}$ et $\bar{v}_{N,0}$.
-
-A partir de toutes ces moyennes empiriques on peut aussi trouver les estimateurs de leurs variances sans biais.
-
-On fera aussi plusieurs calibrations pour obtenir plusieurs biais, on peut ainsi calculer la variance sur les différents biais.
-
-\subsection{EKF}
-L'application de la rotation est bien linéaire mais les termes de la rotation ne le sont pas. Par conséquent appliquer le filtre de Kalman serait imprécis à cause de la non linéarité. On a donc décidé d'appliquer le filtre de Kalman étendu (EKF) qui fonctionne mieux que le filtre de Kalman dans le cas non linéaire.
-
-Notre idée est d'utiliser l'IMU pour faire la prédiction modèle en raison de sa fréquence d'échantillonnage élevée. Malheureusement son biais et sa variance capteur entraînent une dérive quadratique au cours du temps sur la position. Au contraire notre capteur GNSS est plus lent mais plus précis. On souhaite alors l'utiliser pour corriger les prédictions faites à partir de l'IMU, c'est à dire que notre filtre utilisera uniquement notre modèle tant qu'on ne reçoit pas de mesures du capteur GNSS, une fois une mesure reçue on appliquera la correction du filtre EKF.
-
-\subsubsection{Vecteur d'état x et de commande u}
-En se rappelant la forme d'un système dynamique discret :
 \[
-\begin{cases}
-    \mathbf x_k = f(\mathbf x_{k-1}, \mathbf u_{k-1}) + \mathbf w_{k-1} \\
-    \mathbf y_k = h(\mathbf x_k) + \mathbf v_k
-\end{cases}
+b_{a,y}=\frac1N\sum_{k=1}^{N}a_{y,k}
 \]
-avec : 
-\[
-\begin{aligned}
-    \mathbf w_k \sim \mathcal{N}(0, \mathbf Q_k), \\
-    \mathbf v_k \sim \mathcal{N}(0, \mathbf R)
-\end{aligned}
-\]
-$\mathbf Q_k$ le bruit de commande et $\mathbf R$ le bruit de mesure, ces matrices seront définies plus loin.
 
-On décide de poser le vecteur d'état :
 \[
-\mathbf x_k = 
-\begin{pmatrix}
-    E_k \\
-    N_k \\
-    v_{E,k} \\
-    v_{N,k} \\
-    \theta_k \\
-    \phi_k \\
-    \psi_k \\
-    b_{a,E,k} \\
-    b_{a,N,k} \\
-    b_{g,\theta,k} \\
-    b_{g,\phi,k} \\
-    b_{g,\psi,k}
+b_{g,z}=\frac1N\sum_{k=1}^{N}\omega_{z,k}
+\]
+
+Ces valeurs sont ensuite retirées aux mesures avant leur utilisation dans le filtre. De plus, la variance de ces signaux statiques nous permet de dimensionner les matrices de covariance du bruit du filtre.
+
+\subsection{Estimation du cap initial}
+Conformément à notre hypothèse de travail (téléphone positionné à plat), seul le cap horizontal $\theta$ doit être initialisé. Nous exploitons le magnétomètre embarqué qui mesure les composantes $m_x$ et $m_y$ du champ magnétique terrestre. À l'arrêt, le cap initial $\theta_0$ est déterminé par :
+\[
+\theta_0 = \arctan2(m_y, m_x)
+\]
+
+Cette valeur permet d'orienter correctement le vecteur d'état initial avant le début du mouvement. 
+
+\subsection{Filtre de Kalman Etendu (EKF)}
+L'objectif est de combiner les données du GPS avec celle de l'IMU tout en profitant des avantages de chacune. Les données de l'IMU sont utilisées pour prédire l'évolution de la trajectoire entre deux mesures GPS succesives. La projection des accélérations du repère du téléphone vers le repère terrestre dépend de l'orientation estimée du système. Cette opération introduit des termes trigonométriques dans le modèle, ce qui rend la dynamique du système non linéaire. Dans ce contexte le filtre de Kalman n'est pas idéal. Nous utilisons un filtre de Kalman Etendu (EKF) capable de prendre en compte ces non-linéarités. 
+
+\subsubsection{Vecteur d'état}
+
+L'état du système est défini par :
+
+\[
+\mathbf{x}_k = \begin{pmatrix} x_k \\ y_k \\ v_{x,k} \\ v_{y,k} \\ \theta_k \end{pmatrix}
+\]
+où $x_k, y_k$ sont les positions en mètres, $v_{x,k}, v_{y,k}$ les vitesses linéaires dans le repère monde, et $\theta_k$ le cap.
+
+\subsubsection{Étape de prédiction}
+À chaque pas de temps $\Delta t$, les accélérations mesurées dans le repère du téléphone sont corrigées de leurs biais respectifs puis projetées dans le repère global (monde) via la matrice de rotation plane 2D :
+\[
+\begin{pmatrix} a_{x,k}^{\text{monde}} \\ a_{y,k}^{\text{monde}} \end{pmatrix} = 
+\begin{pmatrix} \cos\theta_{k-1} & -\sin\theta_{k-1} \\ \sin\theta_{k-1} & \cos\theta_{k-1} \end{pmatrix}
+\begin{pmatrix} a_{x,k} - b_{a,x} \\ a_{y,k} - b_{a,y} \end{pmatrix}
+\]
+
+L'état prédit $\mathbf{x}_{k|k-1}$ est mis à jour à l'aide des équations de la cinématique :
+\[
+\mathbf{x}_{k|k-1} = \begin{pmatrix}
+x_{k-1} + v_{x,k-1}\Delta t + \frac{1}{2}a_{x,k}^{\text{monde}}\Delta t^2 \\
+y_{k-1} + v_{y,k-1}\Delta t + \frac{1}{2}a_{y,k}^{\text{monde}}\Delta t^2 \\
+v_{x,k-1} + a_{x,k}^{\text{monde}}\Delta t \\
+v_{y,k-1} + a_{y,k}^{\text{monde}}\Delta t \\
+\theta_{k-1} + (\omega_{z,k} - b_{g,z})\Delta t
 \end{pmatrix}
 \]
-qui consiste en les valeurs que l'on cherche à estimer car elles ne sont pas mesurées par l'IMU.
 
-Et le vecteur de commande :
+\subsubsection{Propagation de l'incertitude}
+
+Le filtre ne propage pas uniquement un état mais également l'incertitude associée à cet état.
+
+Pour cela, il utilise la matrice de transition :
+
 \[
-\mathbf u_k = 
-\begin{pmatrix}
-    a_{E,k} \\
-    a_{N,k} \\
-    \omega_{\theta,k} \\
-    \omega_{\phi,k} \\
-    \omega_{\psi,k}
+\mathbf{F} = \begin{pmatrix}
+1 & 0 & \Delta t & 0 & 0 \\
+0 & 1 & 0 & \Delta t & 0 \\
+0 & 0 & 1 & 0 & 0 \\
+0 & 0 & 0 & 1 & 0 \\
+0 & 0 & 0 & 0 & 1
 \end{pmatrix}
 \]
-qui consiste en les valeurs mesurées par l'IMU qui interviennent dans la prédiction modèle. 
 
-On peut encore une fois remarquer que les accélérations dans le vecteur de commande ne correspondent pas à nos mesures réelles. En effet, à chaque itération on appliquera la matrice de changement de base spécifiée plus tôt pour retrouver nos accélérations dans la base de l'ENU en coordonnées sphériques. Il en va de même pour nos biais capteurs. On n'oubliera surtout pas que cette matrice évolue au cours des itérations, on estimera les angles avec des développements limités et c'est pour cela que l'on a fait le choix de mettre les angles $\theta$, $\phi$ et $\psi$ dans notre vecteur d'état malgré le fait qu'ils ne soient pas directement utilisés dans EKF pour estimer $E$ et $N$.
+Cette matrice décrit l'influence de l'état courant sur l'état futur.
 
-\subsubsection{Fonctions f et h}
-Nous allons déterminer la fonction $f$ en utilisant des développements limités que voici :
+La covariance est alors propagée par :
 \[
-\begin{aligned}
-    \mathbf x_k &= f(\mathbf x_{k-1}, \mathbf u_{k-1}) + \mathbf w_{k-1} \\
-                &=
-    \begin{pmatrix}
-        E_{k-1} + \Delta t_k \cdot v_{E,k-1} + \frac{\Delta t^2_k}{2} \cdot (a_{E,k-1} - b_{a,E}) \\
-        N_{k-1} + \Delta t_k \cdot v_{N,k-1} + \frac{\Delta t^2_k}{2} \cdot (a_{N,k-1} - b_{a,N}) \\
-        v_{E,k-1} + \Delta t_k \cdot (a_{E,k-1} - b_{a,E}) \\
-        v_{N,k-1} + \Delta t_k \cdot (a_{N,k-1} - b_{a,N}) \\
-        \theta_{k-1} + \Delta t_k \cdot (\omega_{\theta,k-1} - b_{g,\theta}) \\
-        \phi_{k-1} + \Delta t_k \cdot (\omega_{\phi,k-1} - b_{g,\phi}) \\
-        \psi_{k-1} + \Delta t_k \cdot (\omega_{\psi,k-1} - b_{g,\psi}) \\
-        b_{a,E,k-1} \\
-        b_{a,N,k-1} \\
-        b_{g,\theta,k-1} \\
-        b_{g,\phi,k-1} \\
-        b_{g,\psi,k-1}
-    \end{pmatrix}
-    + \mathbf w_{k-1}
-\end{aligned}
+\mathbf{P}_{k|k-1} = \mathbf{F} \mathbf{P}_{k-1|k-1} \mathbf{F}^\top + \mathbf{Q}
+\]
+où $\mathbf{Q}$ désigne la matrice de covariance du bruit de processus.
+
+\subsubsection{Correction GNSS}
+
+Le récepteur GNSS mesurant uniquement la position bidimensionnelle, la matrice d'observation s'écrit :
+\[
+\mathbf{H} = \begin{pmatrix} 1 & 0 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 & 0 \end{pmatrix}
 \]
 
-Et maintenant la fonction $h$ en utilisant simplement le capteur GNSS :
-\[
-\begin{aligned}
-    \mathbf y_k &= h(\mathbf x_k) + \mathbf v_k \\
-                &=
-    \begin{pmatrix}
-        E_k \\
-        N_k
-    \end{pmatrix}
-    + \mathbf v_k
-\end{aligned}
-\]
+Afin de tenir compte de la qualité variable du signal GNSS, nous utilisons l'indicateur HDOP fourni par le récepteur.
 
-\subsubsection{Matrices F et H}
-Par définition $\mathbf F$ et $\mathbf H$ sont les jacobiennes de $f$ et $h$ respectivement, voici leur notation :
-\[
-\begin{aligned}
-    \mathbf F_k &= \frac{\partial f}{\partial \mathbf x} \Big|_{x_{k-1|k-1}, \, u_{k-1}}, \\
-    \mathbf H_k &= \frac{\partial h}{\partial \mathbf x} \Big|_{x_{k|k-1}}
-\end{aligned}
-\]
-avec $\mathbf x_{k-1|k-1}$ l'état à priori (prédiction + correction) à l'instant $k-1$ et $\mathbf x_{k|k-1}$ l'état prédit à l'instant $k$ avant correction.
+Lorsque le HDOP augmente, la confiance accordée aux mesures GPS diminue. Cette information est intégrée directement dans la matrice de covariance des mesures :
 
-Après avoir défini ces matrices, on peut passer à leur expression :
 \[
-\begin{aligned}
-    \mathbf F_k &=
-    \begin{pmatrix}
-        \mathbf I_2 & \Delta t_k \mathbf I_2 & \mathbf 0_{2\times3} & -\frac{\Delta t_k^2}{2} \mathbf I_2 & \mathbf 0_{2\times3} \\
-        \mathbf 0_{2\times2} & \mathbf I_2 & \mathbf 0_{2\times3} & -\Delta t_k \mathbf I_2 & \mathbf 0_{2\times3} \\
-        \mathbf 0_{3\times2} & \mathbf 0_{3\times2} & \mathbf I_3 & \mathbf 0_{3\times2} & -\Delta t_k \mathbf I_3 \\
-        \mathbf 0_{2\times2} & \mathbf 0_{2\times2} & \mathbf 0_{2\times3} & \mathbf I_2 & \mathbf 0_{2\times3} \\
-        \mathbf 0_{3\times2} & \mathbf 0_{3\times2} & \mathbf 0_{3\times3} & \mathbf 0_{3\times2} & \mathbf I_3
-    \end{pmatrix},
-    \\[1em]
-    \mathbf H_k &= \mathbf H =
-    \begin{pmatrix}
-        \mathbf I_2 & \mathbf 0_{2 \times 10}
-    \end{pmatrix}
-\end{aligned}
-\]
-On peut interprêter $\mathbf F$ comme la matrice qui représente la dynamique du système : elle transporte l'état dans le temps et déforme l'ellipse d'incertitude. De même, $\mathbf F$ représente le modèle de mesure.
-
-On pourrait penser que l'on s'est trompé sur la non linéarité de notre système mais on doit se rappeler que celle-ci se cache dans notre matrice de rotation.
-
-\subsubsection{Matrices Q et R}
-En reprenant la forme d'un système dynamique on a vu que l'on observait du bruit de processus $\mathbf w_{k-1}$ (modèle) et du bruit de mesure $\mathbf v_k$ (capteur) suivant des lois de la forme :
-\[
-\begin{aligned}
-    \mathbf w_k \sim \mathcal{N}(0, \mathbf Q_k), \\
-    \mathbf v_k \sim \mathcal{N}(0, \mathbf R)
-\end{aligned}
-\]
-les matrices $\mathbf Q_k$ et $\mathbf R$ représentant les matrices de covariance du bruit.
-
-On peut remarquer que depuis le début $\mathbf R$ ne dépendait pas de $k$, la raison est que l'on n'opère aucune transformation dans la fonction $h$ sur les mesures de notre capteur GNSS. On a alors :
-\[
-\mathbf R = \mathbf R_0 = \operatorname{diag}\left(\sigma_{E, 0}^2, \, \sigma_{N, 0}^2 \right)
-\]
-
-Intéressons nous maintenant à l'expression de la matrice $\mathbf Q_k$, initialement on a : 
-\[
-\mathbf Q_0 = \operatorname{diag}\left(\sigma_{a, E, 0}^2, \, \sigma_{a, N, 0}^2, \, \sigma_{\omega, \theta, 0}^2, \, \sigma_{\omega, \phi, 0}^2, \, \sigma_{\omega, \psi, 0}^2 \right)
-\]
-et les $\sigma^2$ étant calculés à l'aide de l'estimateur empirique non biaisé de la variance qui est de la forme :
-\[
-\sigma_z^2 = \frac{1}{N-1} \sum_{i=1}^{N} (z_i - \bar{z})^2
-\]
-on pose ensuite la matrice :
-\[
-\begin{aligned}
-\mathbf \Gamma_k &= \frac{\partial f}{\partial \mathbf u} \Big|_{x_{k|k}, \, u_k} \\
-                 &=
-    \begin{pmatrix}
-        \frac{\Delta t_k^2}{2} \mathbf I_2 & \mathbf 0_{2\times3} \\
-        \Delta t_k \mathbf I_2 & \mathbf 0_{2\times3} \\
-        \mathbf 0_{3\times2} & \Delta t_k \mathbf I_3 \\
-        \mathbf 0_{5\times2} & \mathbf 0_{5\times3}
-    \end{pmatrix}
-\end{aligned}
-\]
-puis de manière itérative on pose :
-\[
-\mathbf Q_k = \mathbf \Gamma_k \, \mathbf Q_0 \, \mathbf \Gamma_k^\top
-\]
-
-\subsubsection{Propagation de la covariance}
-$\mathbf P_{k|k-1}$ est la matrice de covariance (avant correction) du vecteur $\mathbf x$. Elle est calculée itérativement de la manière suivante :
-\[
-\mathbf P_{k|k-1} = \mathbf F_k \, \mathbf P_{k-1|k-1} \, \mathbf F_k^\top + \mathbf Q_k
-\]
-avec comme cas initial :
-\[
-\mathbf P_{0|0} = \operatorname{diag}\left(\sigma_{E,0}^2, \, \sigma_{N,0}^2, \, \sigma_{v_E,0}^2, \, \sigma_{v_N,0}^2, \, \sigma_{\theta,0}^2, \, \sigma_{\phi,0}^2, \, \sigma_{\psi,0}^2, \, \sigma_{b_{a,E}}^2, \, \sigma_{b_{a,N}}^2, \, \sigma_{b_{g,\theta}}^2, \, \sigma_{b_{g,\phi}}^2, \, \sigma_{b_{g,\psi}}^2 \right)
+R_k = R_{base}\times1.5\times HDOP_k^3
 \]
 
 \subsubsection{Innovation et covariance de l'innovation}
@@ -326,17 +180,10 @@ Une fois le gain de Kalman calculé il ne nous reste plus qu'à corriger notre p
 \end{aligned}
 \]
 
-\subsection{Synchronisation}
-Dans la partie précédente on n'a pas détaillé comment 
 
 \section{Partie 2}
-
 \section{Difficultées rencontrées}
-
 \subsection{Partie 1}
-
 \subsection{Partie 2}
-
 \section{Répartition du travail}
-
 \end{document}
