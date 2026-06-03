@@ -19,7 +19,7 @@ def imu_to_enu(roulis, tangage, lacet):
     ])
     return Rx @ Ry @ Rz
 
-def calibration_multi_immobile(imu_file, gnss_files):
+def calibration_multi_immobile(imu_file, gnss_file, mag_file):
     imu = pd.read_csv(imu_file)
     gnss = pd.read_csv(gnss_file)
     mag = pd.read_csv(mag_file)
@@ -51,9 +51,9 @@ def calibration_multi_immobile(imu_file, gnss_files):
         "gnss_longitude": gnss["longitude"].var(),
         "gnss_latitude": gnss["latitude"].var(),
 
-        "mag_x": imu["mag_x"].var(),
-        "mag_y": imu["mag_y"].var(),
-        "mag_z": imu["mag_z"].var()
+        "mag_x": mag["mag_x"].var(),
+        "mag_y": mag["mag_y"].var(),
+        "mag_z": mag["mag_z"].var()
     }
     return biais, variances
 
@@ -78,60 +78,65 @@ def ekf_gnss_imu(df, biais, variances):
     my = df["mag_y"].to_numpy()
     mz = df["mag_z"].to_numpy()
 
-    # Angles initiaux
     g = 9.81
 
     roulis_0 = np.arccos(biais["accel_x"] / g)
     tangage_0 = np.arcsin(biais["accel_z"] / g)
     lacet_0 = np.arctan2(biais["mag_z"], biais["mag_y"])
 
-    biais_accel_ENU = imu_to_enu(np.array([biais["accel_x"], biais["accel_y"], biais["accel_z"]]))
-    biais_gyro_ENU = imu_to_enu(np.array([biais["gyro_x"], biais["gyro_y"], biais["gyro_z"]]))
-    variances_accel_ENU = imu_to_enu(np.array([variances["accel_x"], variances["accel_y"], variances["accel_z"]]))
-    variances_gyro_ENU = imu_to_enu(np.array([variances["gyro_x"], variances["gyro_y"], variances["gyro_z"]]))
+    R_enu = imu_to_enu(roulis_0, tangage_0, lacet_0)
 
-    x = np.array([
-        latitude[0],
+    b_accel_longitude, b_accel_latitude, _ = R_enu @ np.array([biais["accel_x"], biais["accel_y"], biais["accel_z"]])
+    b_gyro_lacet, b_gyro_roulis, b_gyro_tangage =  biais["gyro_x"], biais["gyro_y"], biais["gyro_z"]
+    variance_accel_longitude, variance_accel_latitude, _ = R_enu @ np.array([variances["accel_x"], variances["accel_y"], variances["accel_z"]])
+    variance_gyro_lacet, variance_gyro_roulis, variance_gyro_tangage = variances["gyro_x"], variances["gyro_y"], variances["gyro_z"]
+
+    x_k = np.array([
         longitude[0],
+        latitude[0],
         0.0,
         0.0,
         tangage_0,
         roulis_0,
         lacet_0,
-        biais_accel_ENU[0],
-        biais_accel_ENU[1],
-        biais_gyro_ENU[0],
-        biais_gyro_ENU[1],
-        biais_gyro_ENU[2]
+        b_accel_longitude,
+        b_accel_latitude,
+        b_gyro_tangage,
+        b_gyro_roulis,
+        b_gyro_lacet
     ])
 
-    P = np.diag([
-        variances[gnss_longitude],
-        variances[gnss_latitude],
-        1e-6,
-        1e-6,
-        1e-6,
-        1e-6,
-        1e-6,
-        1e-6,
-        1e-6,
-        1e-6,
-        1e-6,
-        1e-6
+    P_k = np.diag([
+        variances["gnss_longitude"],
+        variances["gnss_latitude"],
+        variance_vitesse_longitude,
+        variance_vitesse_latitude,
+        variance_gyro_tangage,
+        variance_gyro_roulis,
+        variance_gyro_lacet,
+        variance_b_accel_longitude,
+        variance_b_accel_latitude,
+        variance_b_gyro_tangage,
+        variance_b_gyro_roulis,
+        variance_b_gyro_lacet
     ])
 
-    Q = np.diag([
-        variances[gnss_longitude],
-        variances[gnss_latitude],
-        1e-6,
-        1e-6,
-        1e-6
+    Q_0 = np.diag([
+        variance_accel_longitude,
+        variance_accel_latitude,
+        variance_gyro_tangage,
+        variance_gyro_roulis,
+        variance_gyro_lacet
     ])
+
+    G_k = np.zeros((12, 5))
 
     R = np.diag([
-        variances_
-        1e-5
+        variances["gnss_longitude"],
+        variances["gnss_latitude"],
     ])
+
+    F_k = np.eye(12)
 
     H = np.array([
         [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -143,32 +148,41 @@ def ekf_gnss_imu(df, biais, variances):
     for k in range(len(df)):
         dtk = dt[k]
 
-        
+        F_k[0:2, 2:4] = dtk * np.eye(2)
+        F_k[0:2, 7:9] = (-dtk ** 2 / 2) * np.eye(2)
+        F_k[2:4, 7:9] = -dtk * np.eye(2)
+        F_k[4:7, 9:12] = -dtk * np.eye(3)
 
-        P_pred = F @ P @ F.T + Q
+        G_k[0:2, 0:2] = (dtk ** 2 / 2) * np.eye(2)
+        G_k[2:4, 0:2] = dtk * np.eye(2)
+        G_k[4:7, 2:5] = dtk * np.eye(3)
 
-        z = np.array([
+        Q_k = G_k @ Q_0 @ G_k.T
+
+        P_pred = F_k @ P_k @ F_k.T + Q_k.T
+
+        y_k = np.array([
             latitude[k],
             longitude[k]
         ])
 
-        innovation = z - H @ x_pred
+        r_k = y_k - H @ x_k
 
-        S = H @ P_pred @ H.T + R
+        S_k = H @ P_pred @ H.T + R
 
-        K = P_pred @ H.T @ np.linalg.inv(S)
+        K_k = P_pred @ H.T @ np.linalg.inv(S_k)
 
-        x = x_pred + K @ innovation
+        x_k = x_k + K_k @ r_k
 
-        P = (np.eye(7) - K @ H) @ P_pred
+        P_k = (np.eye(12) - K_k @ H) @ P_pred
 
-        historique.append(x.copy())
+        historique.append(x_k.copy())
 
     historique = np.array(historique)
 
     sortie = df.copy()
 
     sortie["latitude_filtre"] = historique[:, 0]
-    sortie["longitude_filtre"] = historique[:, 1]
+    sortie["E_filtre"] = historique[:, 1]
 
     return sortie
