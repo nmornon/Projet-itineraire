@@ -7,7 +7,7 @@ from typing import List, Optional, Tuple
 from guerreDesTetes.overlay import overlay_png_opacite, overlay_png
 from guerreDesTetes.gameUtils.game import *
 from guerreDesTetes.gameUtils.projections import *
-from guerreDesTetes.gameUtils.imu_position_tracking import get_imu_H_w_to_lidar,player_polar_rotation, T_world_to_lidar
+from guerreDesTetes.gameUtils import imu_position_tracking
 
 BOULE_DIR = Path(__file__).resolve().parents[1] / "bouleSprite"
 BOULE: List[np.ndarray] = [
@@ -16,13 +16,30 @@ BOULE: List[np.ndarray] = [
 
 class Projectile(Entity):
     def __init__(self, nom) -> None:
-        super().__init__(nom, player_polar_rotation, sprites=BOULE)
+        super().__init__(nom, imu_position_tracking.player_polar_rotation, sprites=BOULE)
         self.current_sprite_index: int = 0
-        player_angle = player_polar_rotation[0] 
-        player_profondeur = cartesian_to_polar(*T_world_to_lidar)[1]
-        pt1 = polar_to_cartesian(player_angle, player_profondeur, 0)
-        pt2 = polar_to_cartesian(player_angle, player_profondeur + 300, 0)
-        self.direction = (pt2 - pt1) / np.linalg.norm(pt2 - pt1)
+
+        H_w_to_lidar = imu_position_tracking.get_imu_H_w_to_lidar()
+        H_w_to_cam = np.eye(4, dtype=float)
+        H_w_to_cam[:3, :3] = R_lidar_to_cam @ H_w_to_lidar[:3, :3]
+        H_w_to_cam[:3, 3] = R_lidar_to_cam @ (H_w_to_lidar[:3, 3] - T_lidar_to_cam)
+
+        inv_H_w_to_cam = np.linalg.inv(H_w_to_cam)
+        camera_pos = inv_H_w_to_cam[:3, 3]
+
+        #FRAME CENTER DEPEND DE LA RESOLUTION
+        frame_center = np.array([320.0, 240.0, 1.0], dtype=float)
+        K_inv = np.linalg.inv(K)
+        ray_cam = K_inv @ frame_center
+        ray_cam /= np.linalg.norm(ray_cam)
+
+        forward_cam = H_w_to_cam[:3, :3].T @ ray_cam
+        forward_cam /= np.linalg.norm(forward_cam)
+
+        self.direction = forward_cam
+
+        camera_polar = cartesian_to_polar(*camera_pos)
+        self.setPosition(*camera_polar)
 
     def setSprite(self, sprites: List[np.ndarray]) -> None:
         self.sprites = sprites

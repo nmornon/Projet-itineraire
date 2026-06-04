@@ -52,6 +52,48 @@ def overlay_png_opacite(frame: np.ndarray, png: np.ndarray, x: int, y: int) -> n
     frame[y1:y2, x1:x2] = roi.astype(np.uint8)
     return frame
 
+
+def overlay_png_png(base_png: np.ndarray, png: np.ndarray, x: int, y: int) -> np.ndarray:
+    """Compose deux images PNG (RGBA) en tenant compte des deux alphas.
+
+    base_png : image RGBA de base (background)
+    png : image RGBA à superposer (foreground)
+    x,y : position du centre de la tête sur l'écran
+    """
+    h, w = png.shape[:2]
+    x = x - w // 2
+    y = y - h // 2
+
+    frame_h, frame_w = base_png.shape[:2]
+
+    x1 = max(0, x)
+    y1 = max(0, y)
+    x2 = min(frame_w, x + w)
+    y2 = min(frame_h, y + h)
+
+    if x1 >= x2 or y1 >= y2:
+        return base_png
+
+    png_x1 = x1 - x
+    png_y1 = y1 - y
+    png_x2 = png_x1 + (x2 - x1)
+    png_y2 = png_y1 + (y2 - y1)
+
+    bgr = png[png_y1:png_y2, png_x1:png_x2, :3].astype(float)
+    alpha_png = png[png_y1:png_y2, png_x1:png_x2, 3].astype(float) / 255.0
+
+    roi = base_png[y1:y2, x1:x2].astype(float)
+    alpha_base = roi[:, :, 3] / 255.0
+    
+    for c in range(3):
+        roi[:, :, c] = (alpha_png * bgr[:, :, c] + (1.0 - alpha_png) * roi[:, :, c])
+    
+    # Blend du canal alpha
+    roi[:, :, 3] = (alpha_png * 255.0 + (1.0 - alpha_png) * alpha_base * 255.0)
+    
+    base_png[y1:y2, x1:x2] = roi.astype(np.uint8)
+    return base_png
+
 def overlay_png(frame,png,x,y):
     """ajoute une image PNG sur une frame OpenCV
     
@@ -60,6 +102,9 @@ def overlay_png(frame,png,x,y):
         x,y : position du centre de la tête sur l'écran (ou on veut l'afficher)"""
 
     if png.shape[2] == 4:
+        # si la frame de base est aussi en RGBA, effectuer un compositing complet
+        if frame.shape[2] == 4:
+            return overlay_png_png(frame, png, x, y)
         return overlay_png_opacite(frame, png, x, y)
 
     hauteur,largeur=png.shape[:2]

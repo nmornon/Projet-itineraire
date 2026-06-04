@@ -11,6 +11,7 @@ from guerreDesTetes.gameUtils.imu_position_tracking import update_imu_position_t
 from guerreDesTetes.gameUtils.projectile import Projectile
 from guerreDesTetes.overlay import load_heads, viseur
 from guerreDesTetes.rendering import MAP_MAX_RANGE, create_map_window, draw_text_block, overlay_map
+from guerreDesTetes.gameUtils.heliceSprite import createHeliceSprite
 
 ENEMY_SPAWN_INTERVAL_S = 2.5
 ENEMY_MAX_COUNT = 8
@@ -169,12 +170,14 @@ def spawn_enemy_if_needed(ennemis, heads, next_spawn_ts, now_ts=None):
         return next_spawn_ts
 
     sprite = random.choice(heads) if heads else None
+
+    sprites = createHeliceSprite(sprite)
     ennemi = Ennemi(
         f"Ennemi{len(ennemis) + 1}",
         angle=random.uniform(ENEMY_SPAWN_ANGLE_MIN, ENEMY_SPAWN_ANGLE_MAX),
         profondeur=random.uniform(ENEMY_SPAWN_RANGE_MIN, ENEMY_SPAWN_RANGE_MAX),
         z=random.uniform(ENEMY_SPAWN_HEIGHT_MIN, ENEMY_SPAWN_HEIGHT_MAX),
-        sprites=[sprite],
+        sprites=sprites
     )
     ennemis.append(ennemi)
     return now_ts + ENEMY_SPAWN_INTERVAL_S
@@ -188,7 +191,7 @@ def game_loop(state, lock, button, flask_display=None):
     draw_text_block(blank, ["Attente camera..."])
 
     heads = load_heads()
-    ennemis = [Ennemi("EnnemiInitial", angle=0, profondeur=1500, z=0, sprites=[random.choice(heads) if heads else None])]
+    ennemis = []
     projectiles = []
     next_enemy_spawn_ts = time.monotonic() + 0.5
     next_projectile_ts = 0.0

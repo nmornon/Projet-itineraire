@@ -4,6 +4,9 @@ from pathlib import Path
 from utils import CSVHandler
 
 
+INVALID_GNSS_DOP = 9999.0
+
+
 def resolve_recorded_path(path_str, acquisition_dir):
     """
     Résout un chemin lu dans le CSV (absolu ou relatif au dossier d'acquisition).
@@ -111,36 +114,63 @@ def synchronize_imu_gnss(raw_acquisition_dir, threshold=0.10, suffix="_synced_im
         "timestamp",
         "accel_x", "accel_y", "accel_z",
         "gyro_x", "gyro_y", "gyro_z",
-        "latitude", "longitude"
+        "mag_x","mag_y","mag_z",
+        "latitude", "longitude",
+        "hdop", "pdop", "vdop"
     ])
 
     synced_count = 0
+    imu_count = 0
+    unmatched_count = 0
     used_gnss_indices = set()
+    last_valid_gnss = None
 
     for imu_entry in imu_entries:
+        imu_count += 1
         timestamp_imu = float(imu_entry["timestamp"])
 
-        # Recherche du relevé GNSS avec le timestamp le plus proche
-        closest_gnss = min(gnss_entries, key=lambda g: abs(float(g["timestamp"]) - timestamp_imu))
-        timestamp_gnss = float(closest_gnss["timestamp"])
+        closest_gnss = None
+        closest_gnss_index = None
+        dt = None
 
-        dt = abs(timestamp_imu - timestamp_gnss)
+        if gnss_entries:
+            # Recherche du relevé GNSS avec le timestamp le plus proche
+            closest_gnss_index, closest_gnss = min(
+                enumerate(gnss_entries),
+                key=lambda item: abs(float(item[1]["timestamp"]) - timestamp_imu),
+            )
+            timestamp_gnss = float(closest_gnss["timestamp"])
+            dt = abs(timestamp_imu - timestamp_gnss)
 
-        if dt > threshold:
+            if dt <= threshold and closest_gnss_index in used_gnss_indices:
+                closest_gnss = None
+                closest_gnss_index = None
+
+        if closest_gnss is None or dt is None or dt > threshold:
+            unmatched_count += 1
+            latitude = last_valid_gnss["latitude"] if last_valid_gnss is not None else ""
+            longitude = last_valid_gnss["longitude"] if last_valid_gnss is not None else ""
+            synced_csv.append_row([
+                timestamp_imu,
+                imu_entry["accel_x"], imu_entry["accel_y"], imu_entry["accel_z"],
+                imu_entry["gyro_x"], imu_entry["gyro_y"], imu_entry["gyro_z"],
+                imu_entry["mag_x"], imu_entry["mag_y"], imu_entry["mag_z"],
+                latitude, longitude,
+                INVALID_GNSS_DOP, INVALID_GNSS_DOP, INVALID_GNSS_DOP
+            ])
             continue
 
-        gnss_index = gnss_entries.index(closest_gnss)
-        if gnss_index in used_gnss_indices:
-            continue
-        
-        used_gnss_indices.add(gnss_index)
+        used_gnss_indices.add(closest_gnss_index)
+        last_valid_gnss = closest_gnss
 
         # Ecriture des données synchronisées dans le fichier CSV
         synced_csv.append_row([
             timestamp_imu,
             imu_entry["accel_x"], imu_entry["accel_y"], imu_entry["accel_z"],
             imu_entry["gyro_x"], imu_entry["gyro_y"], imu_entry["gyro_z"],
-            closest_gnss["latitude"], closest_gnss["longitude"]
+            imu_entry["mag_x"], imu_entry["mag_y"], imu_entry["mag_z"],
+            closest_gnss["latitude"], closest_gnss["longitude"],
+            closest_gnss["hdop"],closest_gnss["pdop"],closest_gnss["vdop"]
         ])
 
         synced_count += 1
@@ -148,7 +178,9 @@ def synchronize_imu_gnss(raw_acquisition_dir, threshold=0.10, suffix="_synced_im
     print(f"Dossier brut        : {raw_acquisition_dir}")
     print(f"Dossier synchronisé : {output_dir}")
     print(f"Seuil utilisé       : {threshold * 1000:.1f} ms")
-    print(f"Paires conservées   : {synced_count}")
+    print(f"IMU traitées        : {imu_count}")
+    print(f"Paires GNSS/IMU     : {synced_count}")
+    print(f"IMU sans GNSS       : {unmatched_count}")
 
 
 def main(raw_acquisition_dir, threshold, suffix):

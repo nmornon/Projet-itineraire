@@ -34,13 +34,12 @@ def update_imu_position_tracking(accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro
     """Met à jour la position de l'IMU en fonction des données reçues."""
     global R_world_to_lidar, T_world_to_lidar, last_update_time,player_polar_rotation
 
-    accel = (np.array([accel_x, accel_y, accel_z]) / 1000.0)  # Convertir de mm/s2 à m/s2
+    accel = (np.array([accel_x, accel_y, accel_z]) / 1000.0) # Convertir de mm/s2 à m/s2
     gyro = np.radians(np.array([gyro_x, gyro_y, gyro_z]))
+
     # Mettre à jour la matrice de rotation en fonction des vitesses angulaires
     dt = last_update_time - time.time()
     last_update_time = time.time()
-
-
 
     angle_change = gyro * dt
     R_delta = Rz(angle_change[0])@ Ry(angle_change[2]) @Rx(angle_change[1])

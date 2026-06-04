@@ -13,6 +13,11 @@ class Entity:
         self.current_sprite_index = 0
         self._position = {"theta": position[0] % 360, "r": position[1], "z": position[2]} # coordonnées polaires (angle en degrés, profondeur en mm, z en mm)
 
+    def updateFrame(self) -> None:
+        if not self.sprites:
+            return
+        self.current_sprite_index = (self.current_sprite_index + 1) % len(self.sprites)
+
     def setSprite(self, sprites):
         self.sprites = sprites
 
@@ -38,6 +43,7 @@ class Entity:
         if not self.sprites:
             return None
         sprite_brut = self.sprites[self.current_sprite_index]
+        self.updateFrame()
         taille = self._calculate_sprite_size()
         return cv2.resize(sprite_brut, taille)
 
