@@ -35,7 +35,7 @@ La première partie vise à reconstruire précisément la trajectoire 2D d'un ut
    * Estimation des biais statiques en accélération $(b_{a,x}, b_{a,y})$ et en vitesse angulaire $(b_{g,z})$ sur des séries d'acquisitions immobiles.
    * Estimation du cap initial $\theta_0$ via le magnétomètre : $\theta_0 = \arctan2(m_y, m_x)$.
 5. **Filtre de Kalman Étendu (EKF)** :
-   * **Vecteur d'état** : $x_k = \begin{bmatrix} x_k & y_k & v_{x,k} & v_{y,k} & \theta_k \end{bmatrix}^T$.
+   * **Vecteur d'état** : $$x_k = \begin{bmatrix} x_k & y_k & v_{x,k} & v_{y,k} & \theta_k \end{bmatrix}^T$$.
    * **Prédiction** : Intégration cinématique des accélérations IMU projetées dans le repère monde.
    * **Correction dynamiquement pondérée par le HDOP** : La covariance de mesure $R_k$ s'ajuste dynamiquement selon la qualité du signal GNSS :
      $$R_k = R_{\text{base}} \times 40 \times \text{HDOP}_k^2$$
@@ -58,7 +58,7 @@ Situé dans `PiCode/guerreDesTetes/`, cette partie développe un jeu interactif 
 ### Fonctionnalités & Architecture
 * **Phase Photo** :
   * Capture d'un visage via la caméra.
-  * Détection de visage avec **OpenCV (Classifieur Haar Cascade)** et découpe sous forme d'ovale $128 \times 128$.
+  * Détection de visage avec **OpenCV** et découpe sous forme d'ovale $128 \times 128$.
 * **Phase de Jeu & Projection 3D → 2D** :
   * Les ennemis sont modélisés en coordonnées polaires dans le repère monde ($\theta, r, z$).
   * **Chaîne de transformation géométrique** : Repère Monde $\rightarrow$ Repère LiDAR (orienté via gyromètre IMU) $\rightarrow$ Repère Caméra $\rightarrow$ Projection Image 2D $(u, v)$ via la matrice intrinsèque $K$ de la caméra.
