@@ -35,7 +35,7 @@ La première partie vise à reconstruire précisément la trajectoire 2D d'un ut
    * Estimation des biais statiques en accélération $(b_{a,x}, b_{a,y})$ et en vitesse angulaire $(b_{g,z})$ sur des séries d'acquisitions immobiles.
    * Estimation du cap initial $\theta_0$ via le magnétomètre : $\theta_0 = \arctan2(m_y, m_x)$.
 5. **Filtre de Kalman Étendu (EKF)** :
-   * **Vecteur d'état** : $$x_k = \begin{bmatrix} x_k & y_k & v_{x,k} & v_{y,k} & \theta_k \end{bmatrix}^T$$.
+   * **Vecteur d'état** : $$x_k = \left[ x_k\; y_k\; v_{x,k}\; v_{y,k}\; \theta_k \right]^T$$
    * **Prédiction** : Intégration cinématique des accélérations IMU projetées dans le repère monde.
    * **Correction dynamiquement pondérée par le HDOP** : La covariance de mesure $R_k$ s'ajuste dynamiquement selon la qualité du signal GNSS :
      $$R_k = R_{\text{base}} \times 40 \times \text{HDOP}_k^2$$
